@@ -68,13 +68,15 @@ npx expo start
    - Update your Company Info in the Dashboard settings.
 2. **Event Creation**
    - Navigate to the Events page and create a new event.
-3. **Attendee Management**
+3. **Sponsors Management**
+   - Add, modify or delete sponsors for this event.
+4. **Attendee Management**
    - Add new attendees to the system.
    - Generate an invitation. The backend creates a unique invitation code for the attendee.
-4. **Guest Confirmation**
+5. **Guest Confirmation**
    - The guest visits the confirmation URL (`http://localhost:5173/confirm/<CODE>`).
    - The guest verifies their data and downloads their generated QR Code badge.
-5. **Access Control & Scanning**
+6. **Access Control & Scanning**
    - At the venue, event staff opens the Mobile App.
    - The staff member selects the current event.
    - Using the mobile device's camera, staff scans the guest's QR code badge to validate and record their attendance in real-time.
@@ -88,3 +90,41 @@ npx expo start
 ## License
 
 This project is proprietary and confidential. All rights reserved.
+
+## Screenshots
+
+Login
+
+<img src="_images/access_01.png" alt="Login" width="300">
+
+Events Page
+
+<img src="_images/access_02.png" alt="Events Page" width="300">
+
+Event Guests
+
+<img src="_images/access_03.png" alt="Event Guests" width="300">
+
+Import Guests
+
+<img src="_images/access_04.png" alt="Import Guests" width="300">
+
+Sponsors
+
+<img src="_images/access_05.png" alt="Sponsors" width="300">
+
+Edit Event
+
+<img src="_images/access_06.png" alt="Edit Event" width="300">
+
+Mobile Login
+
+<img src="_images/access_07.jpg" alt="Mobile Login" width="300">
+
+Mobile Event Selection
+
+<img src="_images/access_08.jpg" alt="Mobile Event Selection" width="300">
+
+Guest Scanning
+
+<img src="_images/access_09.jpg" alt="Guest Scanning" width="300">
