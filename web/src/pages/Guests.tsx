@@ -155,7 +155,7 @@ const Guests = () => {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
                                                     {guest.image ? (
-                                                        <img src={`${import.meta.env.VITE_API_URL}${getImagePath(guest.image, `users')}`} alt="" className="w-full h-full object-cover" />
+                                                        <img src={`${import.meta.env.VITE_API_URL}${getImagePath(guest.image, 'users')}`} alt="" className="w-full h-full object-cover" />
                                                     ) : (
                                                         <User size={20} className="text-slate-400" />
                                                     )}
