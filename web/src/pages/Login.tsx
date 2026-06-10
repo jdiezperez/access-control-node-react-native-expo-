@@ -17,14 +17,18 @@ const Login = () => {
         try {
             const res = await axios.post('/api/auth/login', { email, password });
             const user = res.data.user;
-            if (user.type !== 'admin' && user.type !== 'manager') {
+            if (user.type !== 'admin' && user.type !== 'manager' && user.type !== 'superadmin') {
                 setError('Access denied. Only admins and managers can access the dashboard.');
                 setLoading(false);
                 return;
             }
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(user));
-            navigate('/admin');
+            if (user.type === 'superadmin') {
+                navigate('/superadmin/companies');
+            } else {
+                navigate('/admin');
+            }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
         } finally {

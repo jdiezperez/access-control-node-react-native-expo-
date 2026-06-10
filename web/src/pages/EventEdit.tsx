@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
+import CountrySelect from '@/components/CountrySelect';
 
 const EventEdit = () => {
 	const { id } = useParams();
@@ -102,87 +103,50 @@ const EventEdit = () => {
 		}, 0);
 	};
 
-	if (loading) return <div className="p-8">Loading...</div>;
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[400px]">
+				<Loader2 className="animate-spin text-primary" size={40} />
+			</div>
+		);
+	}
 
 	return (
 		<div className="max-w-4xl mx-auto space-y-6 pb-12">
-			<div className="flex justify-between items-center">
+			{/* Back Button & Header */}
+			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<button
 					onClick={() => navigate('/admin')}
-					className="flex items-center gap-2 text-slate-600 hover:text-primary transition-colors"
+					className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-semibold w-fit"
 				>
-					<ArrowLeft size={20} /> Back to Events
+					<ArrowLeft size={16} /> Back to Events
 				</button>
-				<h2 className="text-2xl font-bold text-secondary">{isNew ? 'Create Event' : 'Edit Event'}</h2>
+				<h2 className="text-3xl font-black text-white tracking-tight">{isNew ? 'Create Event' : 'Edit Event'}</h2>
 			</div>
 
-			<form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-				<div className="p-8 space-y-8">
-					{/* Logo Section */}
-					<div className="flex flex-col md:flex-row gap-8 items-start">
-						<div className="w-32 h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-							{event.logo ? (
-								<img src={getImagePath(event.logo, 'events')} alt="Event logo" className="w-full h-full object-cover" />
-							) : (
-								<ImageIcon size={40} className="text-gray-300" />
-							)}
-						</div>
-						<div className="flex-1 space-y-2 w-full">
-							<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-								<ImageIcon size={16} /> Event Logo
-							</label>
-							<div className="flex flex-col gap-2">
-								<input
-									type="file"
-									accept="image/*"
-									onChange={async (e) => {
-										const file = e.target.files?.[0];
-										if (!file) return;
+			{/* Form Container */}
+			<div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
+				<form onSubmit={handleSubmit} className="p-8 space-y-8">
 
-										const formData = new FormData();
-										formData.append('file', file);
-
-										try {
-											setUploading(true);
-											const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload?folder=events`, formData, {
-												headers: {
-													'Content-Type': 'multipart/form-data',
-													Authorization: `Bearer ${token}`
-												}
-											});
-											setEvent({ ...event, logo: res.data.url });
-										} catch (err) {
-											alert('Error uploading image');
-										} finally {
-											setUploading(false);
-										}
-									}}
-									className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 transition-all"
-								/>
-								{uploading && <p className="text-xs text-primary animate-pulse">Uploading...</p>}
-								<p className="text-xs text-slate-400 italic">Select an image to upload as the event logo (PNG, square image).</p>
-							</div>
-						</div>
-					</div>
-
-					<div className="pt-2">
-						<label className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
-							<Tag size={16} /> Event Status
+					{/* Status Section */}
+					<div className="pb-4 border-b border-white/5">
+						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+							<Tag size={14} className="text-primary" /> Event Status
 						</label>
 						<div className="flex flex-wrap gap-4">
 							{[
-								{ id: 'not active', label: 'Not Active', color: 'bg-slate-400', ring: 'ring-slate-400/20' },
-								{ id: 'active', label: 'Active', color: 'bg-emerald-500', ring: 'ring-emerald-500/20' },
-								{ id: 'completed', label: 'Completed', color: 'bg-orange-500', ring: 'ring-orange-500/20' }
+								{ id: 'not active', label: 'Not Active', color: 'bg-white/10 text-slate-300 border-white/10', ring: 'ring-white/10' },
+								{ id: 'active', label: 'Active', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', ring: 'ring-emerald-500/20' },
+								{ id: 'completed', label: 'Completed', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', ring: 'ring-orange-500/20' }
 							].map((status) => (
 								<label
 									key={status.id}
 									className={`
-												relative flex items-center gap-3 px-4 py-2.5 rounded-2xl cursor-pointer transition-all border-2
-												${event.status === status.id
-											? `border-transparent ${status.color} text-white shadow-lg ${status.ring} ring-4`
-											: 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'}
-											`}
+										relative flex items-center gap-3 px-4 py-2.5 rounded-2xl cursor-pointer transition-all border
+										${event.status === status.id
+											? `${status.color} ring-4 ${status.ring}`
+											: 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'}
+									`}
 								>
 									<input
 										type="radio"
@@ -192,7 +156,7 @@ const EventEdit = () => {
 										onChange={() => setEvent({ ...event, status: status.id })}
 										className="sr-only"
 									/>
-									<div className={`w-2 h-2 rounded-full ${event.status === status.id ? 'bg-white' : status.color}`} />
+									<div className={`w-2.5 h-2.5 rounded-full ${event.status === status.id ? 'bg-current' : 'bg-slate-600'}`} />
 									<span className="font-bold text-sm tracking-tight">{status.label}</span>
 								</label>
 							))}
@@ -202,8 +166,8 @@ const EventEdit = () => {
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{/* Name */}
 						<div className="space-y-2 col-span-2">
-							<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-								<Tag size={16} /> Event Name
+							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+								<Tag size={14} className="text-primary" /> Event Name
 							</label>
 							<input
 								type="text"
@@ -211,58 +175,127 @@ const EventEdit = () => {
 								required
 								value={event.name}
 								onChange={handleChange}
-								className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+								style={{ background: 'rgba(255,255,255,0.03)' }}
 							/>
 						</div>
 
+						{/* Logo Section */}
+						<div className="flex flex-col md:flex-row gap-8 items-start pb-6 border-b border-white/5">
+							<div className="w-32 h-32 bg-white rounded-3xl flex items-center justify-center overflow-hidden border border-white/10 p-2 shrink-0">
+								{event.logo ? (
+									<img src={getImagePath(event.logo, 'events')} alt="Event logo" className="w-full h-full object-contain" />
+								) : (
+									<ImageIcon size={40} className="text-slate-400" />
+								)}
+							</div>
+							<div className="flex-1 space-y-2 w-full">
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+									<ImageIcon size={14} className="text-primary" /> Event Logo
+								</label>
+								<div className="flex flex-col gap-2">
+									<input
+										type="file"
+										accept="image/*"
+										onChange={async (e) => {
+											const file = e.target.files?.[0];
+											if (!file) return;
 
+											const resizeImageToBlob = (file: File, maxWidth = 500): Promise<Blob> =>
+												new Promise((resolve, reject) => {
+													const img = new window.Image();
+													const url = URL.createObjectURL(file);
+													img.onload = () => {
+														URL.revokeObjectURL(url);
+														const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+														const canvas = document.createElement('canvas');
+														canvas.width = Math.round(img.width * scale);
+														canvas.height = Math.round(img.height * scale);
+														canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+														canvas.toBlob(
+															blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
+															'image/jpeg',
+															0.85
+														);
+													};
+													img.onerror = reject;
+													img.src = url;
+												});
+
+											try {
+												setUploading(true);
+												const resized = await resizeImageToBlob(file);
+												const formData = new FormData();
+												formData.append('file', resized, file.name.replace(/\.[^.]+$/, '.jpg'));
+
+												const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload?folder=events`, formData, {
+													headers: {
+														'Content-Type': 'multipart/form-data',
+														Authorization: `Bearer ${token}`
+													}
+												});
+												setEvent({ ...event, logo: res.data.url });
+											} catch (err) {
+												alert('Error uploading image');
+											} finally {
+												setUploading(false);
+											}
+										}}
+										className="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-primary file:text-white hover:file:opacity-90 file:cursor-pointer"
+									/>
+									{uploading && <p className="text-xs text-primary animate-pulse">Uploading...</p>}
+									<p className="text-xs text-slate-500 italic">Select an image to upload as the event logo (PNG, square image). Resized to 500px wide.</p>
+								</div>
+							</div>
+						</div>
 
 						{/* Date */}
 						<div className="space-y-2">
-							<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-								<Calendar size={16} /> Date
+							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+								<Calendar size={14} className="text-primary" /> Date
 							</label>
 							<input
 								type="date"
 								name="date"
 								value={event.date || ''}
 								onChange={handleChange}
-								className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+								style={{ background: 'rgba(255,255,255,0.03)' }}
 							/>
 						</div>
 
 						{/* City */}
 						<div className="space-y-2">
-							<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-								<MapPin size={16} /> City
+							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+								<MapPin size={14} className="text-primary" /> City
 							</label>
 							<input
 								type="text"
 								name="city"
 								value={event.city || ''}
 								onChange={handleChange}
-								className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+								style={{ background: 'rgba(255,255,255,0.03)' }}
 							/>
 						</div>
 
 						{/* Country */}
 						<div className="space-y-2">
-							<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-								<MapPin size={16} /> Country
+							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+								<MapPin size={14} className="text-primary" /> Country
 							</label>
-							<input
-								type="text"
-								name="country"
+							<CountrySelect
 								value={event.country || ''}
-								onChange={handleChange}
-								className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+								onChange={v => setEvent({ ...event, country: v })}
+								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-slate-900"
+								style={{ background: 'rgba(255,255,255,0.03)' }}
 							/>
 						</div>
 					</div>
 
 					<div className="space-y-3">
-						<label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-							<Mail size={16} /> Email Template (HTML)
+						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+							<Mail size={14} className="text-primary" /> Email Template (HTML)
 						</label>
 						<textarea
 							ref={textareaRef}
@@ -270,62 +303,52 @@ const EventEdit = () => {
 							value={event.email_template || ''}
 							onChange={handleChange}
 							rows={8}
-							className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-mono text-sm"
+							className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 font-mono text-sm"
+							style={{ background: 'rgba(255,255,255,0.03)' }}
 							placeholder="<h1>Hello {{guest_name}}!</h1>..."
 						></textarea>
 
 						<div className="flex flex-wrap gap-2">
-							<button
-								type="button"
-								onClick={() => insertPlaceholder('{{guest_name}}')}
-								className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition-colors border border-slate-200"
-							>
-								+ Guest Name
-							</button>
-							<button
-								type="button"
-								onClick={() => insertPlaceholder('{{event_name}}')}
-								className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition-colors border border-slate-200"
-							>
-								+ Event Name
-							</button>
-							<button
-								type="button"
-								onClick={() => insertPlaceholder('{{event_city}}, {{event_country}}')}
-								className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition-colors border border-slate-200"
-							>
-								+ Event Location
-							</button>
-							<button
-								type="button"
-								onClick={() => insertPlaceholder('{{event_date}}')}
-								className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition-colors border border-slate-200"
-							>
-								+ Event Date
-							</button>
+							{[
+								{ label: '+ Guest Name', placeholder: '{{guest_name}}' },
+								{ label: '+ Event Name', placeholder: '{{event_name}}' },
+								{ label: '+ Event Location', placeholder: '{{event_city}}, {{event_country}}' },
+								{ label: '+ Event Date', placeholder: '{{event_date}}' }
+							].map((item) => (
+								<button
+									key={item.label}
+									type="button"
+									onClick={() => insertPlaceholder(item.placeholder)}
+									className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-semibold transition-colors"
+								>
+									{item.label}
+								</button>
+							))}
 						</div>
-						<p className="text-xs text-slate-400">Click the buttons above to insert placeholders at the cursor position.</p>
+						<p className="text-xs text-slate-500">Click the buttons above to insert placeholders at the cursor position.</p>
 					</div>
-				</div>
+				</form>
 
-				<div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+				<div className="px-8 py-4 border-t border-white/5 flex justify-between items-center bg-black/10">
 					{!isNew ? (
 						<button
 							type="button"
-							className="flex items-center gap-2 text-red-500 hover:text-red-700 font-medium transition-colors"
+							className="flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors"
 							onClick={() => alert('Delete functionality not implemented yet')}
 						>
-							<Trash2 size={18} /> Delete Event
+							<Trash2 size={16} /> Delete Event
 						</button>
 					) : <div></div>}
 					<button
 						type="submit"
-						className="btn-primary flex items-center gap-2 px-8"
+						onClick={handleSubmit}
+						className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+						style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
 					>
-						<Save size={18} /> {isNew ? 'Create Event' : 'Save Changes'}
+						<Save size={16} /> {isNew ? 'Create Event' : 'Save Changes'}
 					</button>
 				</div>
-			</form>
+			</div>
 		</div>
 	);
 };

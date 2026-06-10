@@ -26,6 +26,8 @@ export default function NavBar() {
         if (userStr) {
             const user = JSON.parse(userStr);
             setIsAdmin(user.type === 'admin');
+            // Superadmin has no company_id — skip logo fetch
+            if (user.type === 'superadmin') return;
         }
         const fetchLogo = async () => {
             try {
@@ -46,7 +48,7 @@ export default function NavBar() {
     const navigation = getNavigation();
 
     return (
-        <Disclosure as="nav" className="relative bg-gray-700">
+        <Disclosure as="nav" className="relative border-b border-white/10 backdrop-blur-sm bg-black/20 sticky top-0 z-50">
             <div className="mx-auto px-2 sm:px-6 lg:px-8">
                 <div className="relative flex h-16 items-center justify-between">
                     <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">

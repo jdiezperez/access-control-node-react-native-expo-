@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Building2, Mail, Phone, MapPin, Upload, Loader2, CheckCircle2, AlertCircle, Globe } from 'lucide-react';
+import CountrySelect from '@/components/CountrySelect';
 
 interface Company {
     name: string;
@@ -98,124 +99,130 @@ const CompanyInfo = () => {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
+            {/* Header */}
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold text-slate-800">Company Information</h1>
-                <p className="text-slate-500 text-lg">Manage your organization's public profile and contact details.</p>
+                <h1 className="text-3xl font-black text-white tracking-tight">Company Information</h1>
+                <p className="text-slate-400 font-medium mt-0.5">Manage your organization's public profile and contact details.</p>
             </div>
 
             {status && (
-                <div className={`p-4 rounded-xl flex items-center gap-3 border ${
-                    status.type === 'success' ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'
+                <div className={`p-4 rounded-2xl flex items-center gap-3 border ${
+                    status.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
                 }`}>
                     {status.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                    <span className="font-medium">{status.message}</span>
+                    <span className="font-semibold">{status.message}</span>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            {/* Form Container */}
+            <div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
                 <form onSubmit={handleSave} className="p-8 md:p-12 space-y-10">
                     {/* Logo Section */}
-                    <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-slate-100">
+                    <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-white/5">
                         <div className="relative group">
-                            <div className="w-32 h-32 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
+                            <div className="w-32 h-32 rounded-3xl bg-white flex items-center justify-center overflow-hidden border border-white/10 p-2">
                                 {company.logo ? (
-                                    <img src={company.logo} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                                    <img src={company.logo} alt="Company Logo" className="w-full h-full object-contain" />
                                 ) : (
-                                    <Building2 className="text-slate-300" size={48} />
+                                    <Building2 className="text-slate-400" size={48} />
                                 )}
                                 {uploading && (
-                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center">
                                         <Loader2 className="animate-spin text-primary" size={24} />
                                     </div>
                                 )}
                             </div>
-                            <label className="absolute -bottom-3 -right-3 p-2 bg-primary text-white rounded-xl shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                                <Upload size={18} />
+                            <label className="absolute -bottom-2 -right-2 p-2.5 bg-primary text-white rounded-xl shadow-lg cursor-pointer hover:scale-105 transition-transform">
+                                <Upload size={16} />
                                 <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                             </label>
                         </div>
                         <div className="flex-1 text-center md:text-left space-y-1">
-                            <h3 className="text-lg font-bold text-slate-800">Company Logo</h3>
-                            <p className="text-sm text-slate-500">Update your company logo. Square images work best. PNG, JPG or SVG up to 2MB.</p>
+                            <h3 className="text-lg font-bold text-white">Company Logo</h3>
+                            <p className="text-sm text-slate-400">Update your company logo. Square images work best. PNG, JPG or SVG up to 2MB.</p>
                         </div>
                     </div>
 
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <Building2 size={16} className="text-primary" /> Company Name
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Building2 size={14} className="text-primary" /> Company Name
                             </label>
                             <input
                                 type="text"
                                 value={company.name}
                                 onChange={e => setCompany({ ...company, name: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                                 placeholder="Antigravity Inc."
                                 required
                             />
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <Mail size={16} className="text-primary" /> Official Email
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Mail size={14} className="text-primary" /> Official Email
                             </label>
                             <input
                                 type="email"
                                 value={company.email}
                                 onChange={e => setCompany({ ...company, email: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                                 placeholder="hello@antigravity.io"
                             />
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <Phone size={16} className="text-primary" /> Phone Number
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Phone size={14} className="text-primary" /> Phone Number
                             </label>
                             <input
                                 type="text"
                                 value={company.phone}
                                 onChange={e => setCompany({ ...company, phone: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                                 placeholder="+1 (555) 000-0000"
                             />
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <MapPin size={16} className="text-primary" /> City
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <MapPin size={14} className="text-primary" /> City
                             </label>
                             <input
                                 type="text"
                                 value={company.city}
                                 onChange={e => setCompany({ ...company, city: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                                 placeholder="New York"
                             />
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <Globe size={16} className="text-primary" /> Country
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Globe size={14} className="text-primary" /> Country
                             </label>
-                            <input
-                                type="text"
+                            <CountrySelect
                                 value={company.country}
-                                onChange={e => setCompany({ ...company, country: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all"
-                                placeholder="United States"
+                                onChange={v => setCompany({ ...company, country: v })}
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-slate-900"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                             />
                         </div>
 
                         <div className="space-y-3 md:col-span-2">
-                            <label className="text-sm font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                <MapPin size={16} className="text-primary" /> Headquarters Address
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <MapPin size={14} className="text-primary" /> Headquarters Address
                             </label>
                             <textarea
                                 value={company.address}
                                 onChange={e => setCompany({ ...company, address: e.target.value })}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all min-h-[100px]"
+                                className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 min-h-[100px]"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}
                                 placeholder="123 Tech Avenue, Silicon Valley, CA"
                             />
                         </div>
@@ -225,9 +232,10 @@ const CompanyInfo = () => {
                         <button
                             type="submit"
                             disabled={saving}
-                            className="px-10 py-4 bg-primary text-white rounded-2xl font-bold text-lg shadow-xl shadow-primary/30 hover:bg-primary/90 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
+                            className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                            style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
                         >
-                            {saving ? <Loader2 className="animate-spin" size={24} /> : 'Save Changes'}
+                            {saving ? <Loader2 className="animate-spin" size={20} /> : 'Save Changes'}
                         </button>
                     </div>
                 </form>

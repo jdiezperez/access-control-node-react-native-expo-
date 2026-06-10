@@ -72,66 +72,68 @@ const EventsSponsors = () => {
     });
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate('/admin')}
-                        className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                        className="p-2 border border-white/10 rounded-2xl hover:bg-white/5 hover:text-white transition-all text-slate-400"
                     >
                         <ArrowLeft size={20} />
                     </button>
-                    <h2 className="text-2xl font-bold text-slate-800">Event Sponsors</h2>
+                    <h1 className="text-3xl font-black text-white tracking-tight">Event Sponsors</h1>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all font-semibold shadow-sm"
+                        className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+                        style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
                     >
-                        <Plus size={18} /> Add Sponsors
+                        <Plus size={16} /> Add Sponsors
                     </button>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="rounded-3xl border border-white/10 p-6" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
                 <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                         type="text"
                         placeholder="Search sponsors by name, contact, phone..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        className="w-full pl-12 pr-4 py-3 rounded-2xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                        style={{ background: 'rgba(255,255,255,0.03)' }}
                     />
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Table Card */}
+            <div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
                 {loading ? (
                     <div className="p-12 flex flex-col items-center justify-center gap-4">
                         <Loader2 className="animate-spin text-primary" size={40} />
-                        <p className="text-slate-500 font-medium">Loading sponsors...</p>
+                        <p className="text-slate-400 font-medium">Loading sponsors...</p>
                     </div>
                 ) : filteredSponsors.length === 0 ? (
                     <div className="p-12 text-center">
-                        <Filter className="mx-auto text-slate-300 mb-4" size={48} />
-                        <h3 className="text-lg font-bold text-slate-800">No sponsors found</h3>
-                        <p className="text-slate-500">No sponsors assigned to this event or matching your search.</p>
+                        <Filter className="mx-auto text-slate-500 mb-4" size={48} />
+                        <h3 className="text-lg font-bold text-white">No sponsors found</h3>
+                        <p className="text-slate-400">No sponsors assigned to this event or matching your search.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-slate-50 border-b border-gray-100">
+                            <thead className="bg-black/10 border-b border-white/5">
                                 <tr>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Logo</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Logo</th>
                                     {['name', 'contact', 'contact_email', 'contact_phone', 'country'].map(field => (
                                         <th
                                             key={field}
                                             onClick={() => handleSort(field as keyof Sponsor)}
-                                            className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors"
+                                            className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
                                         >
                                             <div className="flex items-center gap-1">
                                                 {field.replace('_', ' ')}
@@ -141,50 +143,50 @@ const EventsSponsors = () => {
                                             </div>
                                         </th>
                                     ))}
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-white/5">
                                 {filteredSponsors.map(sponsor => (
-                                    <tr key={sponsor.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <tr key={sponsor.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4">
                                             {sponsor.logo ? (
-                                                <img src={sponsor.logo} alt={sponsor.name} className="w-10 h-10 object-contain rounded bg-white border border-gray-100" />
+                                                <img src={sponsor.logo} alt={sponsor.name} className="w-10 h-10 object-contain rounded bg-white border border-white/10" />
                                             ) : (
-                                                <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center text-slate-400">
+                                                <div className="w-10 h-10 bg-slate-800 rounded flex items-center justify-center text-slate-400 border border-white/10">
                                                     <Globe size={20} />
                                                 </div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="font-medium text-slate-700">{sponsor.name}</div>
+                                            <div className="font-semibold text-white">{sponsor.name}</div>
                                             {sponsor.url && (
                                                 <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">
                                                     <Globe size={10} /> {sponsor.url.substring(0, 20)}
                                                 </a>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-slate-600">{sponsor.contact || '-'}</td>
+                                        <td className="px-6 py-4 text-slate-300">{sponsor.contact || '-'}</td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                                                <Mail size={14} className="text-slate-400" />
+                                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                                                <Mail size={14} className="text-slate-500" />
                                                 {sponsor.contact_email || '-'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                                                <Phone size={14} className="text-slate-400" />
+                                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                                                <Phone size={14} className="text-slate-500" />
                                                 {sponsor.contact_phone || '-'}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-slate-600">{sponsor.country || '-'}</td>
+                                        <td className="px-6 py-4 text-slate-300">{sponsor.country || '-'}</td>
                                         <td className="px-6 py-4 text-center">
                                             <button
                                                 onClick={() => handleRemoveSponsor(sponsor.id)}
-                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
                                                 title="Remove from event"
                                             >
-                                                <Unlink size={18} />
+                                                <Unlink size={16} />
                                             </button>
                                         </td>
                                     </tr>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Briefcase, Loader2, Save, Upload, MapPin } from 'lucide-react';
 import axios from 'axios';
+import CountrySelect from '@/components/CountrySelect';
 
 interface GuestModalProps {
     isOpen: boolean;
@@ -235,11 +236,10 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit }: GuestModalProps) =
                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                                 <MapPin size={14} /> Country
                             </label>
-                            <input
-                                type="text"
+                            <CountrySelect
                                 value={formData.country}
-                                onChange={e => setFormData({ ...formData, country: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                onChange={v => setFormData({ ...formData, country: v })}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
                             />
                         </div>
 

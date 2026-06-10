@@ -11,20 +11,25 @@ import UsersManagement from './pages/Users';
 import Sponsors from '@/pages/Sponsors';
 import PublicConfirmation from '@/pages/PublicConfirmation';
 import AdminLayout from '@/layouts/AdminLayout';
+import SuperAdminLayout from '@/layouts/SuperAdminLayout';
+import Companies from '@/pages/Companies';
+
+const getUserType = (): string | null => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  try { return JSON.parse(userStr).type; } catch { return null; }
+};
 
 const ProtectedRoute = ({ children, allowedTypes }: { children: React.ReactNode, allowedTypes?: string[] }) => {
   const isAuthenticated = !!localStorage.getItem('token');
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (allowedTypes) {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      if (!allowedTypes.includes(user.type)) {
-        return <Navigate to="/admin" replace />;
-      }
-    } else {
-      return <Navigate to="/login" replace />;
+    const type = getUserType();
+    if (!type) return <Navigate to="/login" replace />;
+    if (!allowedTypes.includes(type)) {
+      // Redirect superadmins to their own section, others to /admin
+      return <Navigate to={type === 'superadmin' ? '/superadmin/companies' : '/admin'} replace />;
     }
   }
   return <>{children}</>;
@@ -38,7 +43,20 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/confirm/:code" element={<PublicConfirmation />} />
 
-        {/* Private Routes (Admin) */}
+        {/* Private Routes — Superadmin */}
+        <Route
+          path="/superadmin"
+          element={
+            <ProtectedRoute allowedTypes={['superadmin']}>
+              <SuperAdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/superadmin/companies" replace />} />
+          <Route path="companies" element={<Companies />} />
+        </Route>
+
+        {/* Private Routes — Admin / Manager */}
         <Route
           path="/admin"
           element={

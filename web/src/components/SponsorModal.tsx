@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Globe, Mail, Phone, Loader2, Save, MapPin, Image as ImageIcon, AlignLeft } from 'lucide-react';
 import axios from 'axios';
+import CountrySelect from '@/components/CountrySelect';
 
 interface SponsorModalProps {
     isOpen: boolean;
@@ -236,11 +237,10 @@ const SponsorModal = ({ isOpen, onClose, onSave, sponsorToEdit }: SponsorModalPr
                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                                 <MapPin size={14} /> Country
                             </label>
-                            <input
-                                type="text"
+                            <CountrySelect
                                 value={formData.country}
-                                onChange={e => setFormData({ ...formData, country: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                onChange={v => setFormData({ ...formData, country: v })}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
                             />
                         </div>
                     </div>

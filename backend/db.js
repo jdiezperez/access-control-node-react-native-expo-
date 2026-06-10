@@ -23,7 +23,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK(type IN ('admin', 'manager', 'user', 'guest')) DEFAULT 'guest',
+    type TEXT NOT NULL CHECK(type IN ('admin', 'manager', 'user', 'guest', 'superadmin')) DEFAULT 'guest',
     name TEXT NOT NULL,
     surname TEXT NOT NULL,
     role TEXT,
@@ -96,9 +96,9 @@ db.exec(`
 `);
 
 // Seed initial admin if not exists
+const bcrypt = require('bcrypt');
 const adminCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE type = ?').get('admin');
 if (adminCount.count === 0) {
-  const bcrypt = require('bcrypt');
   const hashedPassword = bcrypt.hashSync('admin', 10);
   let company = db.prepare('SELECT id FROM company LIMIT 1').get();
   if (!company) {
@@ -109,6 +109,16 @@ if (adminCount.count === 0) {
     'Admin', 'User', 'admin@example.com', hashedPassword, 'admin', company.id
   );
   console.log('Default admin created: admin@example.com / admin');
+}
+
+// Seed superadmin if not exists
+const superadminCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE type = ?').get('superadmin');
+if (superadminCount.count === 0) {
+  const hashedPassword = bcrypt.hashSync('superadmin', 10);
+  db.prepare('INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(
+    'Super', 'Admin', 'superadmin@example.com', hashedPassword, 'superadmin', null
+  );
+  console.log('Default superadmin created: superadmin@example.com / superadmin');
 }
 
 module.exports = db;
