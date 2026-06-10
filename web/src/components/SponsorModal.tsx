@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Globe, Mail, Phone, Loader2, Save, Upload, MapPin, Image as ImageIcon, AlignLeft } from 'lucide-react';
+import { X, Globe, Mail, Phone, Loader2, Save, MapPin, Image as ImageIcon, AlignLeft } from 'lucide-react';
 import axios from 'axios';
 
 interface SponsorModalProps {

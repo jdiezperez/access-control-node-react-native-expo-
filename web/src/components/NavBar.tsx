@@ -5,11 +5,11 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getImagePath } from '@/utils/imagePath';
 
-const navigation = [
+const getNavigation = () => [
     { name: 'Events', href: '/admin' },
     { name: 'Guests', href: '/admin/guests' },
     { name: 'Sponsors', href: '/admin/sponsors' },
-]
+];
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
@@ -19,8 +19,14 @@ export default function NavBar() {
     const location = useLocation();
     const [logo, setLogo] = useState<string | null>(null);
     const token = localStorage.getItem('token');
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            setIsAdmin(user.type === 'admin');
+        }
         const fetchLogo = async () => {
             try {
                 const res = await axios.get('/api/admin/company', {
@@ -30,11 +36,14 @@ export default function NavBar() {
                     setLogo(res.data.logo);
                 }
             } catch (err) {
-                console.error('Failed to fetch company logo:', err);
+                // Non-critical: logo simply won't appear if unavailable
+                console.debug('Company logo not available');
             }
         };
         fetchLogo();
     }, [token]);
+
+    const navigation = getNavigation();
 
     return (
         <Disclosure as="nav" className="relative bg-gray-700">
@@ -106,14 +115,16 @@ export default function NavBar() {
                                 transition
                                 className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg outline outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in"
                             >
-                                <MenuItem>
-                                    <Link
-                                        to="/admin/company/info"
-                                        className="block px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
-                                    >
-                                        Info
-                                    </Link>
-                                </MenuItem>
+                                {isAdmin && (
+                                    <MenuItem>
+                                        <Link
+                                            to="/admin/company/info"
+                                            className="block px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
+                                        >
+                                            Company Info
+                                        </Link>
+                                    </MenuItem>
+                                )}
                                 <MenuItem>
                                     <Link
                                         to="/admin/users"
@@ -125,7 +136,10 @@ export default function NavBar() {
                                 <MenuItem>
                                     <Link
                                         to="/login"
-                                        onClick={() => localStorage.removeItem('token')}
+                                        onClick={() => {
+                                            localStorage.removeItem('token');
+                                            localStorage.removeItem('user');
+                                        }}
                                         className="block px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
                                     >
                                         Sign out

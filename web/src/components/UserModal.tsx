@@ -19,15 +19,22 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
         confirmPassword: '',
         role: '',
         gender: '',
-        isAdmin: false,
+        type: 'user',
         image: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentUserType, setCurrentUserType] = useState<string>('');
 
     useEffect(() => {
+        const currentUserStr = localStorage.getItem('user');
+        if (currentUserStr) {
+            const currentUser = JSON.parse(currentUserStr);
+            setCurrentUserType(currentUser.type);
+        }
+
         if (userToEdit) {
             setFormData({
                 name: userToEdit.name || '',
@@ -37,7 +44,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                 confirmPassword: '',
                 role: userToEdit.role || '',
                 gender: userToEdit.gender || '',
-                isAdmin: userToEdit.type === 'admin',
+                type: userToEdit.type || 'user',
                 image: userToEdit.image || ''
             });
         } else {
@@ -49,7 +56,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                 confirmPassword: '',
                 role: '',
                 gender: '',
-                isAdmin: false,
+                type: 'user',
                 image: ''
             });
         }
@@ -92,7 +99,6 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
             const token = localStorage.getItem('token');
             const payload = {
                 ...formData,
-                type: formData.isAdmin ? 'admin' : 'user',
                 organization: companyInfo.name,
                 city: companyInfo.city,
                 country: companyInfo.country
@@ -261,26 +267,27 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 <option value="prefer not to say">Prefer not to say</option>
                             </select>
                         </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                <Shield size={14} /> Account Permission *
+                            </label>
+                            <select
+                                required
+                                value={formData.type}
+                                onChange={e => setFormData({ ...formData, type: e.target.value })}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
+                            >
+                                {currentUserType === 'admin' && (
+                                    <option value="admin">Administrator</option>
+                                )}
+                                <option value="manager">Manager</option>
+                                <option value="user">Scanner Staff</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="pt-4 flex items-center justify-between border-t border-slate-100">
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                            <div className="relative">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only"
-                                    checked={formData.isAdmin}
-                                    onChange={e => setFormData({ ...formData, isAdmin: e.target.checked })}
-                                />
-                                <div className={`w-12 h-6 rounded-full transition-colors ${formData.isAdmin ? 'bg-primary' : 'bg-slate-200'}`}></div>
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${formData.isAdmin ? 'translate-x-6' : ''}`}></div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Shield size={16} className={formData.isAdmin ? 'text-primary' : 'text-slate-400'} />
-                                <span className="text-sm font-bold text-slate-700">Administrator Access</span>
-                            </div>
-                        </label>
-
+                    <div className="pt-4 flex items-center justify-end border-t border-slate-100">
                         <div className="flex gap-3">
                             <button
                                 type="button"

@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import {
-    Check, X, QrCode, Send, Upload, Mail, Users, Plus,
-    ChevronDown, ChevronRight, Edit2, Trash2, Calendar,
-    Loader2, Search, User, MapPin, Briefcase
-} from 'lucide-react';
+import { Check, X, Upload, Plus, ChevronDown, ChevronRight, Edit2, Trash2, Calendar, Loader2, Search, User, MapPin, Briefcase } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
 import GuestModal from '@/components/GuestModal';
 

@@ -13,6 +13,9 @@ const UsersManagement = () => {
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [assignUser, setAssignUser] = useState<any>(null);
     const token = localStorage.getItem('token');
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const currentUserType = currentUser.type || '';
+    const currentUserId = currentUser.id;
 
     useEffect(() => {
         fetchData();
@@ -23,10 +26,10 @@ const UsersManagement = () => {
             setLoading(true);
             const [usersRes, companyRes] = await Promise.all([
                 axios.get('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/api/admin/company', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('/api/admin/company', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: null }))
             ]);
-            // Filter only admins and users (exclude guests)
-            setUsers(usersRes.data.filter((u: any) => u.type === 'admin' || u.type === 'user'));
+            // Filter only admins, managers, and users (exclude guests)
+            setUsers(usersRes.data.filter((u: any) => u.type === 'admin' || u.type === 'manager' || u.type === 'user'));
             setCompanyInfo(companyRes.data);
         } catch (err) {
             console.error('Failed to fetch data:', err);
@@ -116,7 +119,13 @@ const UsersManagement = () => {
                                         No users found matching your search.
                                     </td>
                                 </tr>
-                            ) : filteredUsers.map(user => (
+                            ) : filteredUsers.map(user => {
+                                // Managers cannot modify admin users
+                                const canEdit = currentUserType === 'admin' || user.type !== 'admin';
+                                // Cannot edit yourself via this table (self-edit has no password change support)
+                                const isSelf = user.id === currentUserId;
+
+                                return (
                                 <tr key={user.id} className="hover:bg-slate-50/30 transition-colors">
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-4">
@@ -124,7 +133,10 @@ const UsersManagement = () => {
                                                 {user.image ? <img src={user.image} className="w-full h-full object-cover" /> : <User size={24} />}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-slate-800">{user.name} {user.surname}</div>
+                                                <div className="font-bold text-slate-800">
+                                                    {user.name} {user.surname}
+                                                    {isSelf && <span className="ml-2 text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary px-2 py-0.5 rounded-md">You</span>}
+                                                </div>
                                                 <div className="flex items-center gap-2 text-sm text-slate-500">
                                                     <Mail size={12} /> {user.email}
                                                 </div>
@@ -136,7 +148,10 @@ const UsersManagement = () => {
                                             <div className="text-sm font-bold text-slate-700 flex items-center gap-2">
                                                 {user.role || 'No Role Assigned'}
                                             </div>
-                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${user.type === 'admin' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                                user.type === 'admin' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
+                                                user.type === 'manager' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                                 }`}>
                                                 {user.type === 'admin' ? <Shield size={10} /> : <User size={10} />}
                                                 {user.type}
@@ -145,28 +160,41 @@ const UsersManagement = () => {
                                     </td>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={() => setAssignUser(user)}
-                                                className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-indigo-100"
-                                            >
-                                                <CalendarPlus size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
-                                                className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-indigo-100"
-                                            >
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(user.id)}
-                                                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all border border-transparent hover:border-red-100"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            {canEdit && (
+                                                <button
+                                                    onClick={() => setAssignUser(user)}
+                                                    title="Assign to events"
+                                                    className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-indigo-100"
+                                                >
+                                                    <CalendarPlus size={18} />
+                                                </button>
+                                            )}
+                                            {canEdit && (
+                                                <button
+                                                    onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
+                                                    title="Edit user"
+                                                    className="p-2 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all border border-transparent hover:border-indigo-100"
+                                                >
+                                                    <Edit2 size={18} />
+                                                </button>
+                                            )}
+                                            {canEdit && !isSelf && (
+                                                <button
+                                                    onClick={() => handleDelete(user.id)}
+                                                    title="Delete user"
+                                                    className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all border border-transparent hover:border-red-100"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                            {!canEdit && (
+                                                <span className="text-xs text-slate-300 font-medium italic">Admin — protected</span>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

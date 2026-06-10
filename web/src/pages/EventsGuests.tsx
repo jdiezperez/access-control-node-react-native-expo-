@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
     ArrowLeft, Plus, Upload, Search, X, Check,
     ChevronUp, ChevronDown, Filter, Loader2, Unlink,
-    User, Send, QrCode, Mail, AlertCircle, CheckCircle2,
+    User, QrCode, Mail, AlertCircle, CheckCircle2,
     Mails
 } from 'lucide-react';
 import type { Guest } from '@/data/Types';

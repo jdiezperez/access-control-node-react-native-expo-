@@ -23,7 +23,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK(type IN ('admin', 'user', 'guest')) DEFAULT 'guest',
+    type TEXT NOT NULL CHECK(type IN ('admin', 'manager', 'user', 'guest')) DEFAULT 'guest',
     name TEXT NOT NULL,
     surname TEXT NOT NULL,
     role TEXT,
@@ -34,8 +34,12 @@ db.exec(`
     image TEXT,
     email TEXT UNIQUE NOT NULL,
     password TEXT,
-    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    company_id INTEGER,
+    FOREIGN KEY(company_id) REFERENCES company(id)
   );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_one_admin_per_company ON users (company_id) WHERE type = 'admin';
 
   CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +50,9 @@ db.exec(`
     email_template TEXT,
     logo TEXT,
     status TEXT DEFAULT 'not active' CHECK(status IN ('not active', 'active', 'completed')),
-    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    company_id INTEGER,
+    FOREIGN KEY(company_id) REFERENCES company(id)
   );
 
   CREATE TABLE IF NOT EXISTS sponsors (
@@ -58,7 +64,9 @@ db.exec(`
     contact TEXT,
     contact_email TEXT,
     contact_phone TEXT,
-    country TEXT
+    country TEXT,
+    company_id INTEGER,
+    FOREIGN KEY(company_id) REFERENCES company(id)
   );
 
   CREATE TABLE IF NOT EXISTS events_sponsors (
@@ -91,11 +99,16 @@ db.exec(`
 const adminCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE type = ?').get('admin');
 if (adminCount.count === 0) {
   const bcrypt = require('bcrypt');
-  const hashedPassword = bcrypt.hashSync('admin123', 10);
-  db.prepare('INSERT INTO users (name, surname, email, password, type) VALUES (?, ?, ?, ?, ?)').run(
-    'Admin', 'User', 'admin@example.com', hashedPassword, 'admin'
+  const hashedPassword = bcrypt.hashSync('admin', 10);
+  let company = db.prepare('SELECT id FROM company LIMIT 1').get();
+  if (!company) {
+    const info = db.prepare("INSERT INTO company (name) VALUES ('Default Company')").run();
+    company = { id: info.lastInsertRowid };
+  }
+  db.prepare('INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(
+    'Admin', 'User', 'admin@example.com', hashedPassword, 'admin', company.id
   );
-  console.log('Default admin created: admin@example.com / admin123');
+  console.log('Default admin created: admin@example.com / admin');
 }
 
 module.exports = db;

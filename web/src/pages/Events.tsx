@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, MapPin, Plus, Image as ImageIcon, Mail, Star, User } from 'lucide-react';
+import { Calendar, MapPin, Plus, Image as ImageIcon, Star, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getImagePath } from '@/utils/imagePath';
 

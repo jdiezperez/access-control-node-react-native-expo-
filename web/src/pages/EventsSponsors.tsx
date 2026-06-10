@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Plus, Search, X, Check, ChevronUp, ChevronDown, Filter, Loader2, Unlink, Globe, Mail, Phone } from 'lucide-react';
+import { ArrowLeft, Plus, Search, ChevronUp, ChevronDown, Filter, Loader2, Unlink, Globe, Mail, Phone } from 'lucide-react';
 import type { Sponsor } from '@/data/Types';
 import AddSponsorModal from '../components/AddSponsorModal';
 

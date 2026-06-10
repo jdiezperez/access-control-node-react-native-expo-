@@ -12,9 +12,22 @@ import Sponsors from '@/pages/Sponsors';
 import PublicConfirmation from '@/pages/PublicConfirmation';
 import AdminLayout from '@/layouts/AdminLayout';
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children, allowedTypes }: { children: React.ReactNode, allowedTypes?: string[] }) => {
   const isAuthenticated = !!localStorage.getItem('token');
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (allowedTypes) {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (!allowedTypes.includes(user.type)) {
+        return <Navigate to="/admin" replace />;
+      }
+    } else {
+      return <Navigate to="/login" replace />;
+    }
+  }
+  return <>{children}</>;
 };
 
 function App() {
@@ -29,7 +42,7 @@ function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedTypes={['admin', 'manager']}>
               <AdminLayout />
             </ProtectedRoute>
           }
@@ -41,7 +54,14 @@ function App() {
           <Route path="events/:id/sponsors" element={<EventsSponsors />} />
           <Route path="guests" element={<Guests />} />
           <Route path="sponsors" element={<Sponsors />} />
-          <Route path="company/info" element={<CompanyInfo />} />
+          <Route
+            path="company/info"
+            element={
+              <ProtectedRoute allowedTypes={['admin']}>
+                <CompanyInfo />
+              </ProtectedRoute>
+            }
+          />
           <Route path="users" element={<UsersManagement />} />
         </Route>
 
