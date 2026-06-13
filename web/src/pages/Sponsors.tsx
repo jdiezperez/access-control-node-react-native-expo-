@@ -96,7 +96,7 @@ const Sponsors = () => {
                 <div className="flex items-center gap-4">
                     <div
                         className="p-4 rounded-3xl shadow-lg shadow-blue-500/20"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                     >
                         <ImageIcon size={32} className="text-white" />
                     </div>
@@ -111,7 +111,7 @@ const Sponsors = () => {
                     <button
                         onClick={() => { setSponsorToEdit(null); setIsModalOpen(true); }}
                         className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                     >
                         <Plus size={18} /> Add New
                     </button>

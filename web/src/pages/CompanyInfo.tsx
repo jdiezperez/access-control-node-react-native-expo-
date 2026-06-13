@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Building2, Mail, Phone, MapPin, Upload, Loader2, CheckCircle2, AlertCircle, Globe } from 'lucide-react';
 import CountrySelect from '@/components/CountrySelect';
+import { getImagePath } from '@/utils/imagePath';
 
 interface Company {
     name: string;
@@ -60,7 +61,7 @@ const CompanyInfo = () => {
         try {
             setUploading(true);
             const res = await axios.post('/api/admin/upload?folder=company', formData, {
-                headers: { 
+                headers: {
                     Authorization: `Bearer ${token}`
                 }
             });
@@ -106,9 +107,8 @@ const CompanyInfo = () => {
             </div>
 
             {status && (
-                <div className={`p-4 rounded-2xl flex items-center gap-3 border ${
-                    status.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
-                }`}>
+                <div className={`p-4 rounded-2xl flex items-center gap-3 border ${status.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                    }`}>
                     {status.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
                     <span className="font-semibold">{status.message}</span>
                 </div>
@@ -122,7 +122,7 @@ const CompanyInfo = () => {
                         <div className="relative group">
                             <div className="w-32 h-32 rounded-3xl bg-white flex items-center justify-center overflow-hidden border border-white/10 p-2">
                                 {company.logo ? (
-                                    <img src={company.logo} alt="Company Logo" className="w-full h-full object-contain" />
+                                    <img src={getImagePath(company.logo, 'company')} alt="Company Logo" className="w-full h-full object-contain" />
                                 ) : (
                                     <Building2 className="text-slate-400" size={48} />
                                 )}
@@ -233,7 +233,7 @@ const CompanyInfo = () => {
                             type="submit"
                             disabled={saving}
                             className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
-                            style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                         >
                             {saving ? <Loader2 className="animate-spin" size={20} /> : 'Save Changes'}
                         </button>

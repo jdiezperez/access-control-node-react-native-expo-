@@ -69,7 +69,7 @@ const UsersManagement = () => {
                 <div className="flex items-center gap-4">
                     <div
                         className="p-4 rounded-3xl shadow-lg shadow-blue-500/20"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                     >
                         <UsersIcon size={32} className="text-white" />
                     </div>
@@ -81,7 +81,7 @@ const UsersManagement = () => {
                 <button
                     onClick={() => { setSelectedUser(null); setIsModalOpen(true); }}
                     className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all"
-                    style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                 >
                     <Plus size={20} /> Add User
                 </button>
@@ -134,73 +134,72 @@ const UsersManagement = () => {
                                 const isSelf = user.id === currentUserId;
 
                                 return (
-                                <tr key={user.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 overflow-hidden border border-white/10">
-                                                {user.image ? <img src={user.image} className="w-full h-full object-cover" /> : <User size={24} />}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-white">
-                                                    {user.name} {user.surname}
-                                                    {isSelf && <span className="ml-2 text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20">You</span>}
+                                    <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 overflow-hidden border border-white/10">
+                                                    {user.image ? <img src={user.image} className="w-full h-full object-cover" /> : <User size={24} />}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-sm text-slate-400 mt-0.5">
-                                                    <Mail size={12} /> {user.email}
+                                                <div>
+                                                    <div className="font-bold text-white">
+                                                        {user.name} {user.surname}
+                                                        {isSelf && <span className="ml-2 text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20">You</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm text-slate-400 mt-0.5">
+                                                        <Mail size={12} /> {user.email}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <div className="space-y-1.5">
-                                            <div className="text-sm font-bold text-slate-300">
-                                                {user.role || 'No Role Assigned'}
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="space-y-1.5">
+                                                <div className="text-sm font-bold text-slate-300">
+                                                    {user.role || 'No Role Assigned'}
+                                                </div>
+                                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                                        user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    }`}>
+                                                    {user.type === 'admin' ? <Shield size={10} /> : <User size={10} />}
+                                                    {user.type}
+                                                </div>
                                             </div>
-                                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                                user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                }`}>
-                                                {user.type === 'admin' ? <Shield size={10} /> : <User size={10} />}
-                                                {user.type}
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => setAssignUser(user)}
+                                                        title="Assign to events"
+                                                        className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all"
+                                                    >
+                                                        <CalendarPlus size={16} />
+                                                    </button>
+                                                )}
+                                                {canEdit && (
+                                                    <button
+                                                        onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
+                                                        title="Edit user"
+                                                        className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                )}
+                                                {canEdit && !isSelf && (
+                                                    <button
+                                                        onClick={() => handleDelete(user.id)}
+                                                        title="Delete user"
+                                                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                                {!canEdit && (
+                                                    <span className="text-xs text-slate-500 font-semibold italic">Admin — protected</span>
+                                                )}
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center justify-center gap-2">
-                                            {canEdit && (
-                                                <button
-                                                    onClick={() => setAssignUser(user)}
-                                                    title="Assign to events"
-                                                    className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all"
-                                                >
-                                                    <CalendarPlus size={16} />
-                                                </button>
-                                            )}
-                                            {canEdit && (
-                                                <button
-                                                    onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
-                                                    title="Edit user"
-                                                    className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                            )}
-                                            {canEdit && !isSelf && (
-                                                <button
-                                                    onClick={() => handleDelete(user.id)}
-                                                    title="Delete user"
-                                                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                            {!canEdit && (
-                                                <span className="text-xs text-slate-500 font-semibold italic">Admin — protected</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                    </tr>
                                 );
                             })}
                         </tbody>

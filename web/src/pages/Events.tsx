@@ -53,7 +53,7 @@ const Events = () => {
 				<div className="flex items-center gap-4">
 					<div
 						className="p-4 rounded-3xl shadow-lg shadow-blue-500/20"
-						style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+						style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
 					>
 						<CalendarDays size={32} className="text-white" />
 					</div>
@@ -68,7 +68,7 @@ const Events = () => {
 					id="btn-create-event"
 					onClick={handleCreateEvent}
 					className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all"
-					style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+					style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
 				>
 					<Plus size={20} /> New Event
 				</button>
@@ -86,7 +86,7 @@ const Events = () => {
 					<button
 						onClick={handleCreateEvent}
 						className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold transition-all hover:opacity-90"
-						style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+						style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
 					>
 						<Plus size={18} /> Create Event
 					</button>
@@ -111,7 +111,7 @@ const Events = () => {
 										{event.logo ? (
 											<img src={getImagePath(event.logo, 'events')} alt={event.name} className="w-full h-full object-cover" />
 										) : (
-											<div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}>
+											<div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
 												<ImageIcon className="text-white" size={24} />
 											</div>
 										)}

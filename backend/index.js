@@ -48,7 +48,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-	if (req.user.type !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+	if (req.user.type !== 'admin' && req.user.type !== 'superadmin') return res.status(403).json({ message: 'Admin access required' });
 	next();
 };
 
@@ -108,7 +108,7 @@ app.post('/api/auth/login', (req, res) => {
 	}
 
 	const token = jwt.sign({ id: user.id, email: user.email, type: user.type, company_id: user.company_id }, JWT_SECRET, { expiresIn: '24h' });
-	res.json({ token, user: { id: user.id, name: user.name, type: user.type, company_id: user.company_id } });
+	res.json({ token, user: { id: user.id, name: user.name, surname: user.surname, email: user.email, role: user.role, gender: user.gender, type: user.type, company_id: user.company_id } });
 });
 
 // Upload Route
@@ -121,7 +121,7 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => 
 
 // Admin Routes - Company
 // GET: managers & admins can read company info (needed for logo, org name)
-app.get('/api/admin/company', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.get('/api/admin/company', authenticateToken, isAdmin, (req, res) => {
 	const company = db.prepare('SELECT * FROM company WHERE id = ?').get(req.user.company_id);
 	res.json(company || {});
 });
@@ -140,7 +140,7 @@ app.post('/api/admin/company', authenticateToken, isAdmin, (req, res) => {
 });
 
 // Admin Routes - Users (Admins & Guests)
-app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.get('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
 	const type = req.query.type;
 	let users;
 	if (type) {
@@ -151,12 +151,19 @@ app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
 	res.json(users);
 });
 
-app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.post('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
 	const { name, surname, email, type, password, city, country, organization, role, gender } = req.body;
 
 	// Validation: manager cannot create/promote admin
+
+	/**** DELETE 
 	if (req.user.type === 'manager' && type === 'admin') {
 		return res.status(403).json({ message: 'Managers cannot create admin users' });
+	}
+	*/
+
+	if (req.user.type === 'admin' && type === 'superadmin') {
+		return res.status(403).json({ message: 'Admins cannot create superadmin users' });
 	}
 
 	// Validation: one admin per company
@@ -173,7 +180,7 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 			INSERT INTO users (name, surname, email, type, password, city, country, organization, role, gender, company_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`).run(
-			name, surname, email, type || 'guest', hashedPassword, 
+			name, surname, email, type || 'guest', hashedPassword,
 			city || null, country || null, organization || null, role || null, gender || null,
 			req.user.company_id
 		);
@@ -184,7 +191,7 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 	}
 });
 
-app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.put('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 	const { name, surname, email, type, city, country, organization, role, gender, image } = req.body;
 
 	// Validation: manager cannot promote/demote admin & user must be in same company
@@ -193,8 +200,14 @@ app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) 
 		return res.status(404).json({ message: 'User not found' });
 	}
 
+	/**** DELETE
 	if (req.user.type === 'manager' && (type === 'admin' || userToEdit.type === 'admin')) {
 		return res.status(403).json({ message: 'Managers cannot modify or assign admin privileges' });
+	}
+	*/
+
+	if (req.user.type === 'admin' && (type === 'superadmin' || userToEdit.type === 'superadmin')) {
+		return res.status(403).json({ message: 'Admins cannot modify or assign superadmin privileges' });
 	}
 
 	// Validation: one admin per company
@@ -216,12 +229,18 @@ app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) 
 	}
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 	const userToDelete = db.prepare('SELECT type, company_id FROM users WHERE id = ?').get(req.params.id);
 	if (!userToDelete || userToDelete.company_id !== req.user.company_id) return res.status(404).json({ message: 'User not found' });
 
+	/**** DELETE 
 	if (req.user.type === 'manager' && userToDelete.type === 'admin') {
 		return res.status(403).json({ message: 'Managers cannot delete admins' });
+	}
+	*/
+
+	if (userToDelete.type === 'superadmin') {
+		return res.status(403).json({ message: 'Superadmin cannot be deleted' });
 	}
 
 	try {
@@ -341,7 +360,7 @@ const FRONTEND_URL = `${FRONTEND_BASE}:${FRONTEND_PORT}`;
 const buildEmailHtml = (template, guest, event, invitationCode) => {
 	const date = event.date ? new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 	const confirmationLink = `${FRONTEND_URL}/confirm/${invitationCode}`;
-	
+
 	let html = template
 		.replace(/{{guest_name}}/g, `${guest.name} ${guest.surname}`)
 		.replace(/{{event_name}}/g, event.name || '')
@@ -868,7 +887,7 @@ app.get('/api/mobile/events', authenticateToken, isStaff, (req, res) => {
 
 app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
 	const { invitationCode, eventId } = req.body;
-	
+
 	// Verify if the scanning user is actually assigned to this event
 	const isAssigned = db.prepare(`
 		SELECT 1 FROM events_guests 
@@ -901,8 +920,8 @@ app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
 		WHERE invitation_code = ? AND event_id = ?
 	`).run(invitationCode, eventId);
 
-	res.json({ 
-		success: true, 
+	res.json({
+		success: true,
 		message: 'Attendance validated',
 		guestName: `${guestInfo.name} ${guestInfo.surname}`,
 		eventName: guestInfo.event_name

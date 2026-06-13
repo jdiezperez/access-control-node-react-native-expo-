@@ -231,7 +231,7 @@ const EventsGuests = () => {
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
                     >
                         <Plus size={16} /> Add Guests
                     </button>

@@ -1,5 +1,4 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Login from '@/pages/Login';
 import Events from '@/pages/Events';
 import EventEdit from './pages/EventEdit';
@@ -11,7 +10,6 @@ import UsersManagement from './pages/Users';
 import Sponsors from '@/pages/Sponsors';
 import PublicConfirmation from '@/pages/PublicConfirmation';
 import AdminLayout from '@/layouts/AdminLayout';
-import SuperAdminLayout from '@/layouts/SuperAdminLayout';
 import Companies from '@/pages/Companies';
 
 const getUserType = (): string | null => {
@@ -20,7 +18,7 @@ const getUserType = (): string | null => {
   try { return JSON.parse(userStr).type; } catch { return null; }
 };
 
-const ProtectedRoute = ({ children, allowedTypes }: { children: React.ReactNode, allowedTypes?: string[] }) => {
+const ProtectedRoute = ({ allowedTypes }: { allowedTypes?: string[] }) => {
   const isAuthenticated = !!localStorage.getItem('token');
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -29,10 +27,19 @@ const ProtectedRoute = ({ children, allowedTypes }: { children: React.ReactNode,
     if (!type) return <Navigate to="/login" replace />;
     if (!allowedTypes.includes(type)) {
       // Redirect superadmins to their own section, others to /admin
-      return <Navigate to={type === 'superadmin' ? '/superadmin/companies' : '/admin'} replace />;
+      switch (type) {
+        case 'superadmin':
+          return <Navigate to="/superadmin/companies" replace />;
+        case 'admin':
+        case 'manager':
+          return <Navigate to="/admin" replace />;
+        default:
+          return <Navigate to="/login" replace />;
+      }
     }
   }
-  return <>{children}</>;
+  //  return <>{children}</>;
+  return <Outlet />;
 };
 
 function App() {
@@ -44,45 +51,35 @@ function App() {
         <Route path="/confirm/:code" element={<PublicConfirmation />} />
 
         {/* Private Routes — Superadmin */}
-        <Route
-          path="/superadmin"
-          element={
-            <ProtectedRoute allowedTypes={['superadmin']}>
-              <SuperAdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/superadmin/companies" replace />} />
-          <Route path="companies" element={<Companies />} />
+        <Route element={<ProtectedRoute allowedTypes={['superadmin']} />}>
+          <Route path="/superadmin" element={<AdminLayout />}>
+            <Route
+              index
+              element={<Navigate to="/superadmin/companies" replace />}
+            />
+            <Route path="companies" element={<Companies />} />
+          </Route>
         </Route>
 
         {/* Private Routes — Admin / Manager */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedTypes={['admin', 'manager']}>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Events />} />
-          <Route path="events/new" element={<EventEdit />} />
-          <Route path="events/:id" element={<EventEdit />} />
-          <Route path="events/:id/guests" element={<EventsGuests />} />
-          <Route path="events/:id/sponsors" element={<EventsSponsors />} />
-          <Route path="guests" element={<Guests />} />
-          <Route path="sponsors" element={<Sponsors />} />
-          <Route
-            path="company/info"
-            element={
-              <ProtectedRoute allowedTypes={['admin']}>
-                <CompanyInfo />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="users" element={<UsersManagement />} />
-        </Route>
+        <Route element={<ProtectedRoute allowedTypes={['admin', 'manager']} />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Events />} />
 
+            <Route path="events/new" element={<EventEdit />} />
+            <Route path="events/:id" element={<EventEdit />} />
+            <Route path="events/:id/guests" element={<EventsGuests />} />
+            <Route path="events/:id/sponsors" element={<EventsSponsors />} />
+            <Route path="guests" element={<Guests />} />
+            <Route path="sponsors" element={<Sponsors />} />
+
+            {/* Only admin */}
+            <Route element={<ProtectedRoute allowedTypes={['admin']} />}>
+              <Route path="company/info" element={<CompanyInfo />} />
+              <Route path="users" element={<UsersManagement />} />
+            </Route>
+          </Route>
+        </Route>
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
     </Router>

@@ -32,21 +32,6 @@ export default function SuperAdminLayout() {
                         </div>
                     </div>
 
-                    {/* Nav Links */}
-                    <div className="flex items-center gap-1">
-                        <Link
-                            to="/superadmin/companies"
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                                isActive('/superadmin/companies')
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                        >
-                            <Building2 size={16} />
-                            Companies
-                        </Link>
-                    </div>
-
                     {/* Logout */}
                     <button
                         onClick={handleLogout}
