@@ -28,15 +28,10 @@ const EventEdit = () => {
 	const isNew = id === 'new' || !id;
 	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
-	const [activeTab, setActiveTab] = useState<'info' | 'fields'>('info');
-
-	// Check if we should auto-switch to fields tab
-	useEffect(() => {
-		const state = location.state as { tab?: string } | null;
-		if (state?.tab === 'fields' && !isNew) {
-			setActiveTab('fields');
-		}
-	}, [location.state, isNew]);
+    const state = location.state as { tab?: string } | null;
+    console.log('Location state:', state);
+    const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() =>	state?.tab === 'fields' && !isNew ? 'fields' : 'info'
+);
 
 	useEffect(() => {
         const load = async () => {
@@ -156,11 +151,13 @@ const EventEdit = () => {
 					{!isNew && (
 						<button
 							onClick={() => setActiveTab('fields')}
+                            disabled={event.status !== 'not active'}
+                            title={event.status !== 'not active' ? 'Cannot edit Guest Data when event is Active or Completed' : ''}
 							className={`flex-1 px-6 py-4 text-sm font-semibold transition-all border-l border-white/10 ${
 								activeTab === 'fields'
 									? 'text-white border-b-2 border-blue-500'
 									: 'text-slate-400 hover:text-slate-300'
-							}`}
+							} ${event.status !== 'not active' ? 'opacity-50 cursor-not-allowed' : ''}`}
 						>
 							Guest Data
 						</button>
@@ -329,7 +326,7 @@ const EventEdit = () => {
 							<CountrySelect
 								value={event.country || ''}
 								onChange={v => setEvent({ ...event, country: v })}
-								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-slate-900"
+								className="w-full px-4 pt-3 pb-4 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-[#293143]"
 								style={{ background: 'rgba(255,255,255,0.03)' }}
 							/>
 						</div>
@@ -399,7 +396,7 @@ const EventEdit = () => {
 				</form>
 
 				<div className="px-8 py-4 border-t border-white/5 flex justify-between items-center bg-black/10">
-					{!isNew ? (
+					{(!isNew && activeTab === 'info') ? (
 						<button
 							type="button"
 							className="flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors"

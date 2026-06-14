@@ -217,7 +217,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, onFiel
 			)}
 
 			{/* Fields List */}
-			<div className="space-y-3">{newField.field_type}
+			<div className="space-y-3">
 				{fields.length === 0 ? (
 					<div className="text-center py-8 text-slate-400">
 						<p className="text-sm">No custom fields yet</p>
@@ -256,8 +256,8 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, onFiel
 										<FieldTypeSelector
 											fieldType={field.field_type}
 											fieldValues={field.field_values}
-											onTypeChange={(type) => setFields(fields.map(f => f.id === field.id ? { ...f, field_type: type } : f))}
-											onValuesChange={(values) => setFields(fields.map(f => f.id === field.id ? { ...f, field_values: values } : f))}
+											onTypeChange={(type) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_type: type } : f)))}}
+											onValuesChange={(values) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_values: values } : f)))}}
 										/>
 
 										<label className="flex items-center gap-2 text-white cursor-pointer">
@@ -292,7 +292,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, onFiel
 										<div className="font-semibold text-white text-sm">{field.field_name}</div>
 										<div className="text-xs text-slate-400 mt-1">
 											Type: <span className="text-slate-300">{field.field_type}</span>
-											{field.required && <span className="ml-3 text-blue-400">• Required</span>}
+											{field.required ? (<span className="ml-3 text-blue-400">• Required</span>): null}
 										</div>
 										{field.field_type === 'options' && field.field_values && (
 											<div className="text-xs text-slate-400 mt-2">

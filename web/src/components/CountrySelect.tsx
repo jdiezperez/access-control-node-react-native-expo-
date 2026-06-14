@@ -62,9 +62,13 @@ const CountrySelect = ({ value, onChange, className = '', required = false, id }
             onChange={e => onChange(e.target.value)}
             className={className}
         >
-            <option value="">Select country…</option>
+            <option value="">
+                Select country…
+            </option>
             {COUNTRIES.map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                    {c}
+                </option>
             ))}
         </select>
     );

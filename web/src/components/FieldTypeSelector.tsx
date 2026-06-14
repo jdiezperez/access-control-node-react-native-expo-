@@ -23,7 +23,8 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 		{ id: 'text', label: 'Text', description: 'Single line text input' },
 		{ id: 'number', label: 'Number', description: 'Numeric input' },
 		{ id: 'yes/no', label: 'Yes/No', description: 'Boolean choice' },
-		{ id: 'options', label: 'Options', description: 'Multiple choice dropdown' }
+		{ id: 'options', label: 'Options', description: 'Multiple choice dropdown' },
+		{ id: 'date', label: 'Date', description: 'Date picker' }
 	];
 
 	const handleAddOption = () => {
@@ -64,7 +65,7 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 								relative flex items-start gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all border
 								${fieldType === type.id
 									? 'border-blue-500/50 bg-blue-500/10 text-white ring-2 ring-blue-500/20'
-									: 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'}
+									: 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'}
 							`}
 						>
 							<input
@@ -77,7 +78,7 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 							<div className={`w-4 h-4 rounded-full border-2 mt-0.5 ${fieldType === type.id ? 'border-blue-400 bg-blue-400' : 'border-slate-500'}`} />
 							<div>
 								<div className="font-semibold text-sm">{type.label}</div>
-								<div className="text-xs text-slate-500">{type.description}</div>
+								<div className="text-xs text-slate-400">{type.description}</div>
 							</div>
 						</label>
 					))}
