@@ -513,6 +513,213 @@ app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, (req, res)
 	res.json({ success: true });
 });
 
+// Admin Routes - Custom Event Fields
+app.get('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const fields = db.prepare(`
+		SELECT id, event_id, field_name, field_type, field_values, field_order, required
+		FROM fields
+		WHERE event_id = ?
+		ORDER BY field_order ASC
+	`).all(req.params.eventId);
+	
+	res.json(fields);
+});
+
+app.post('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const { field_name, field_type, field_values, required } = req.body;
+	if (!field_name || !field_type) return res.status(400).json({ message: 'field_name and field_type required' });
+	
+	try {
+		const maxOrder = db.prepare('SELECT COALESCE(MAX(field_order), -1) as max_order FROM fields WHERE event_id = ?').get(req.params.eventId);
+		const info = db.prepare(`
+			INSERT INTO fields (event_id, field_name, field_type, field_values, field_order, required)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`).run(req.params.eventId, field_name, field_type, field_values || null, maxOrder.max_order + 1, required ? 1 : 0);
+		
+		res.json({ id: info.lastInsertRowid });
+	} catch (err) {
+		if (err.message.includes('UNIQUE constraint failed')) {
+			return res.status(400).json({ message: 'Field name already exists for this event' });
+		}
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
+app.put('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const field = db.prepare('SELECT event_id FROM fields WHERE id = ?').get(req.params.fieldId);
+	if (!field || field.event_id !== parseInt(req.params.eventId)) return res.status(404).json({ message: 'Field not found' });
+	
+	const { field_name, field_type, field_values, required } = req.body;
+	
+	try {
+		db.prepare(`
+			UPDATE fields
+			SET field_name = COALESCE(?, field_name),
+				field_type = COALESCE(?, field_type),
+				field_values = ?,
+				required = COALESCE(?, required),
+				updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?
+		`).run(field_name || null, field_type || null, field_values !== undefined ? field_values : null, required !== undefined ? (required ? 1 : 0) : null, req.params.fieldId);
+		
+		res.json({ success: true });
+	} catch (err) {
+		if (err.message.includes('UNIQUE constraint failed')) {
+			return res.status(400).json({ message: 'Field name already exists for this event' });
+		}
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
+app.delete('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const field = db.prepare('SELECT event_id FROM fields WHERE id = ?').get(req.params.fieldId);
+	if (!field || field.event_id !== parseInt(req.params.eventId)) return res.status(404).json({ message: 'Field not found' });
+	
+	db.prepare('DELETE FROM fields WHERE id = ?').run(req.params.fieldId);
+	res.json({ success: true });
+});
+
+app.post('/api/admin/events/:eventId/fields/reorder', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const { fieldOrder } = req.body; // Array of field IDs in desired order
+	if (!Array.isArray(fieldOrder)) return res.status(400).json({ message: 'fieldOrder must be an array' });
+	
+	try {
+		const stmt = db.prepare('UPDATE fields SET field_order = ? WHERE id = ? AND event_id = ?');
+		fieldOrder.forEach((fieldId, index) => {
+			stmt.run(index, fieldId, req.params.eventId);
+		});
+		res.json({ success: true });
+	} catch (err) {
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
+app.get('/api/admin/events/:eventId/field-templates', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const templates = db.prepare(`
+		SELECT DISTINCT e.id, e.name
+		FROM events e
+		LEFT JOIN fields f ON e.id = f.event_id
+		WHERE e.company_id = ? AND e.id != ? AND f.id IS NOT NULL
+		ORDER BY e.name ASC
+	`).all(req.user.company_id, req.params.eventId);
+	
+	res.json(templates);
+});
+
+app.post('/api/admin/events/:eventId/copy-fields', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const { sourceEventId } = req.body;
+	if (!sourceEventId) return res.status(400).json({ message: 'sourceEventId required' });
+	
+	const sourceEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(sourceEventId);
+	if (!sourceEvent || sourceEvent.company_id !== req.user.company_id) return res.status(404).json({ message: 'Source event not found' });
+	
+	try {
+		// Delete existing fields in target event
+		db.prepare('DELETE FROM fields WHERE event_id = ?').run(req.params.eventId);
+		
+		// Copy fields from source event
+		const sourceFields = db.prepare(`
+			SELECT field_name, field_type, field_values, required
+			FROM fields
+			WHERE event_id = ?
+			ORDER BY field_order ASC
+		`).all(sourceEventId);
+		
+		const stmt = db.prepare(`
+			INSERT INTO fields (event_id, field_name, field_type, field_values, field_order, required)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`);
+		
+		sourceFields.forEach((field, index) => {
+			stmt.run(req.params.eventId, field.field_name, field.field_type, field.field_values, index, field.required);
+		});
+		
+		res.json({ success: true, copiedCount: sourceFields.length });
+	} catch (err) {
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
+// Admin Routes - Guest Custom Data
+app.get('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const customData = db.prepare(`
+		SELECT g.id as custom_data_id, g.field_id, f.field_name, f.field_type, g.field_value
+		FROM guestdata g
+		JOIN fields f ON g.field_id = f.id
+		WHERE g.guest_id = ? AND f.event_id = ?
+		ORDER BY f.field_order ASC
+	`).all(req.params.guestId, req.params.eventId);
+	
+	res.json(customData);
+});
+
+app.post('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const { customData } = req.body; // Array of { field_id, field_value }
+	if (!Array.isArray(customData)) return res.status(400).json({ message: 'customData must be an array' });
+	
+	try {
+		const stmt = db.prepare(`
+			INSERT INTO guestdata (guest_id, field_id, field_value)
+			VALUES (?, ?, ?)
+			ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
+		`);
+		
+		customData.forEach(({ field_id, field_value }) => {
+			stmt.run(req.params.guestId, field_id, field_value || null);
+		});
+		
+		res.json({ success: true });
+	} catch (err) {
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
+app.put('/api/admin/events/:eventId/guests/:guestId/customdata/:fieldId', authenticateToken, isManagerOrAdmin, (req, res) => {
+	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
+	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+	
+	const { field_value } = req.body;
+	
+	try {
+		db.prepare(`
+			UPDATE guestdata
+			SET field_value = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE guest_id = ? AND field_id = ?
+		`).run(field_value || null, req.params.guestId, req.params.fieldId);
+		
+		res.json({ success: true });
+	} catch (err) {
+		res.status(500).json({ message: 'Database error' });
+	}
+});
+
 // Admin Routes - Sponsors
 app.get('/api/admin/sponsors', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const sponsors = db.prepare(`

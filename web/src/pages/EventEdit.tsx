@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
 import CountrySelect from '@/components/CountrySelect';
+import EventFieldsBuilder from '@/components/EventFieldsBuilder';
+import FieldTemplateSelector from '@/components/FieldTemplateSelector';
 
 const EventEdit = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const token = localStorage.getItem('token');
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const [loading, setLoading] = useState(true);
@@ -23,57 +26,69 @@ const EventEdit = () => {
 	});
 
 	const isNew = id === 'new' || !id;
+	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+	const [fieldsRefresh, setFieldsRefresh] = useState(0);
+	const [activeTab, setActiveTab] = useState<'info' | 'fields'>('info');
+
+	// Check if we should auto-switch to fields tab
+	useEffect(() => {
+		const state = location.state as { tab?: string } | null;
+		if (state?.tab === 'fields' && !isNew) {
+			setActiveTab('fields');
+		}
+	}, [location.state, isNew]);
 
 	useEffect(() => {
-		if (!isNew) {
-			fetchEvent();
-		} else {
-			setLoading(false);
-		}
-	}, [id]);
-
-	const fetchEvent = async () => {
-		try {
-			const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events`, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			const currentEvent = res.data.find((e: any) => e.id === parseInt(id || '0'));
-			if (currentEvent) {
-				// Format date for input type="date"
-				if (currentEvent.date) {
-					currentEvent.date = new Date(currentEvent.date).toISOString().split('T')[0];
-				}
-				setEvent(currentEvent);
-			} else {
-				alert('Event not found');
-				navigate('/admin');
-			}
-		} catch (err) {
-			console.error(err);
-			alert('Error fetching event');
-		} finally {
-			setLoading(false);
-		}
-	};
+        const load = async () => {
+            if (id && id !== 'new') {
+                try {
+                    const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const currentEvent = res.data.find((e: {id: number}) => e.id === parseInt(id || '0'));
+                    if (currentEvent) {
+                        // Format date for input type="date"
+                        if (currentEvent.date) {
+                            currentEvent.date = new Date(currentEvent.date).toISOString().split('T')[0];
+                        }
+                        setEvent(currentEvent);
+                    } else {
+                        alert('Event not found');
+                        navigate('/admin');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error fetching event');
+                } finally {
+                    setLoading(false);
+                }
+            } else {
+                setLoading(false);
+            }
+        };
+        load();
+	}, [id, navigate, token]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		try {
 			if (isNew) {
-				await axios.post(
+				const res = await axios.post(
 					`${import.meta.env.VITE_API_URL}/api/admin/events`,
 					event,
 					{
 						headers: { Authorization: `Bearer ${token}` }
 					});
+				// Navigate to the new event with fields tab selected
+				navigate(`/admin/events/${res.data.id}`, { state: { tab: 'fields' } });
 			} else {
 				await axios.put(
 					`${import.meta.env.VITE_API_URL}/api/admin/events/${id}`,
 					event,
 					{ headers: { Authorization: `Bearer ${token}` } }
 				);
+				navigate('/admin');
 			}
-			navigate('/admin');
 		} catch (err) {
 			console.error(err);
 			alert(`Error ${isNew ? 'creating' : 'updating'} event`);
@@ -126,9 +141,36 @@ const EventEdit = () => {
 
 			{/* Form Container */}
 			<div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
-				<form onSubmit={handleSubmit} className="p-8 space-y-8">
+				{/* Tab Buttons */}
+				<div className="flex border-b border-white/10 bg-white/5">
+					<button
+						onClick={() => setActiveTab('info')}
+						className={`flex-1 px-6 py-4 text-sm font-semibold transition-all ${
+							activeTab === 'info'
+								? 'text-white border-b-2 border-blue-500'
+								: 'text-slate-400 hover:text-slate-300'
+						}`}
+					>
+						Event Info
+					</button>
+					{!isNew && (
+						<button
+							onClick={() => setActiveTab('fields')}
+							className={`flex-1 px-6 py-4 text-sm font-semibold transition-all border-l border-white/10 ${
+								activeTab === 'fields'
+									? 'text-white border-b-2 border-blue-500'
+									: 'text-slate-400 hover:text-slate-300'
+							}`}
+						>
+							Guest Data
+						</button>
+					)}
+				</div>
 
-					{/* Status Section */}
+				<form onSubmit={handleSubmit} className="p-8 space-y-8">
+					{activeTab === 'info' && (
+						<>
+							{/* Status Section */}
 					<div className="pb-4 border-b border-white/5">
 						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
 							<Tag size={14} className="text-primary" /> Event Status
@@ -235,8 +277,8 @@ const EventEdit = () => {
 													}
 												});
 												setEvent({ ...event, logo: res.data.url });
-											} catch (err) {
-												alert('Error uploading image');
+											} catch (err: unknown) {
+												alert('Error uploading image, ' + (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (err as { message?: string }).message);
 											} finally {
 												setUploading(false);
 											}
@@ -293,6 +335,8 @@ const EventEdit = () => {
 						</div>
 					</div>
 
+					{/* Email Template Section */}
+
 					<div className="space-y-3">
 						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
 							<Mail size={14} className="text-primary" /> Email Template (HTML)
@@ -327,6 +371,31 @@ const EventEdit = () => {
 						</div>
 						<p className="text-xs text-slate-500">Click the buttons above to insert placeholders at the cursor position.</p>
 					</div>
+						</>
+					)}
+
+					{/* Guest Data Tab */}
+					{activeTab === 'fields' && !isNew && (
+						<>
+							<div className="flex items-center justify-between mb-4">
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+									<Tag size={14} className="text-primary" /> Custom Guest Fields
+								</label>
+								<button
+									type="button"
+									onClick={() => setShowTemplateSelector(true)}
+									className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-blue-400 hover:text-blue-300 text-xs font-semibold border border-blue-500/30 hover:border-blue-500/50 transition-colors"
+								>
+									<Copy size={14} /> Copy from Template
+								</button>
+							</div>
+							<EventFieldsBuilder 
+								eventId={id || null} 
+								onFieldsSaved={() => setFieldsRefresh(prev => prev + 1)}
+								refreshTrigger={fieldsRefresh}
+							/>
+						</>
+					)}
 				</form>
 
 				<div className="px-8 py-4 border-t border-white/5 flex justify-between items-center bg-black/10">
@@ -349,6 +418,18 @@ const EventEdit = () => {
 					</button>
 				</div>
 			</div>
+
+			{/* Template Selector Modal */}
+			{showTemplateSelector && (
+				<FieldTemplateSelector
+					eventId={id || ''}
+					onClose={() => setShowTemplateSelector(false)}
+					onCopied={() => {
+						setFieldsRefresh(prev => prev + 1);
+						setShowTemplateSelector(false);
+					}}
+				/>
+			)}
 		</div>
 	);
 };

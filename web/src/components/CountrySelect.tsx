@@ -16,6 +16,7 @@ interface CountrySelectProps {
     className?: string;
     required?: boolean;
     id?: string;
+    style?: React.CSSProperties;
 }
 
 export const COUNTRIES = [
