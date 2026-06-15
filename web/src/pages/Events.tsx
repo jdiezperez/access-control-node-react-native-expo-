@@ -52,7 +52,7 @@ const Events = () => {
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div className="flex items-center gap-4">
 					<div
-						className="p-4 rounded-3xl shadow-lg shadow-blue-500/20"
+						className="p-4 rounded-3xl shadow-lg shadow-blue-2500/20"
 						style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
 					>
 						<CalendarDays size={32} className="text-white" />
