@@ -7,7 +7,7 @@ console.log('--- VERIFYING MULTI-COMPANY ISOLATION ---');
 
 try {
     // 1. Create a dummy company 2
-    db.prepare("INSERT OR IGNORE INTO company (id, name) VALUES (2, 'Company Two')").run();
+    db.prepare("INSERT OR IGNORE INTO companies (id, name) VALUES (2, 'Company Two')").run();
 
     // 2. Create events for both companies
     db.prepare("DELETE FROM events WHERE name = 'Event Comp 1' OR name = 'Event Comp 2'").run();
@@ -35,7 +35,7 @@ try {
 
     // 5. Clean up test data
     db.prepare("DELETE FROM events WHERE name = 'Event Comp 1' OR name = 'Event Comp 2'").run();
-    db.prepare("DELETE FROM company WHERE id = 2").run();
+    db.prepare("DELETE FROM companies WHERE id = 2").run();
 
     console.log('ALL TENANT-ISOLATION VERIFICATIONS PASSED.');
 } catch (err) {

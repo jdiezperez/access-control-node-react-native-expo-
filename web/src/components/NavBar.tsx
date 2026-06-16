@@ -45,11 +45,12 @@ export default function NavBar() {
         }
         const fetchData = async () => {
             try {
-                const res = await axios.get('/api/admin/company', {
+                const res = await axios.get('/api/admin/companies', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setCompanyInfo(res.data);
                 if (res.data?.logo) {
+                    console.log('Company logo found:', res.data.logo);
                     setLogo(res.data.logo);
                 }
             } catch (err) {
@@ -129,11 +130,11 @@ export default function NavBar() {
                                     />
                                 ) : isSuperAdmin ? (
                                     <div className="h-8 w-8 bg-gray-600 rounded flex items-center justify-center text-white">
-                                        <Scan size={20} />
+                                        <img src='/logo_entrypoint.png' alt="Superadmin Logo" className="w-12 hidden" />
                                     </div>
                                 ) : (
                                     <div className="h-8 w-8 bg-gray-600 rounded flex items-center justify-center text-white">
-                                        <Building2 size={20} />
+                                        <img src={logo ? getImagePath(logo, 'company') : '/logo_entrypoint.png'} alt="Company Logo" className="w-12 hidden" />
                                     </div>
                                 )}
                             </div>

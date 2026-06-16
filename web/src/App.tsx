@@ -53,10 +53,7 @@ function App() {
         {/* Private Routes — Superadmin */}
         <Route element={<ProtectedRoute allowedTypes={['superadmin']} />}>
           <Route path="/superadmin" element={<AdminLayout />}>
-            <Route
-              index
-              element={<Navigate to="/superadmin/companies" replace />}
-            />
+            <Route index element={<Navigate to="/superadmin/companies" replace />} />
             <Route path="companies" element={<Companies />} />
           </Route>
         </Route>

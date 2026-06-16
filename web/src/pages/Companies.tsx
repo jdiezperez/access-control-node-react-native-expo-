@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
     Building2, Plus, Search, Users, CalendarDays,
@@ -32,11 +32,7 @@ const Companies = () => {
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const token = localStorage.getItem('token');
 
-    useEffect(() => {
-        fetchCompanies();
-    }, []);
-
-    const fetchCompanies = async () => {
+    const fetchCompanies = useCallback(async () => {
         try {
             setLoading(true);
             const res = await axios.get('/api/superadmin/companies', {
@@ -48,7 +44,11 @@ const Companies = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [token]);
+
+    useEffect(() => {
+        fetchCompanies();
+    }, [fetchCompanies]);
 
     const handleDelete = async () => {
         if (!deleteConfirm) return;
@@ -60,8 +60,12 @@ const Companies = () => {
             });
             setDeleteConfirm(null);
             fetchCompanies();
-        } catch (err: any) {
-            setDeleteError(err.response?.data?.message || 'Failed to delete company');
+        } catch (err: unknown) {
+            if (axios.isAxiosError(err)) {
+                setDeleteError(err.response?.data?.message || 'Failed to delete company');
+            } else {
+                setDeleteError('Failed to delete company');
+            }
         } finally {
             setDeleting(false);
         }

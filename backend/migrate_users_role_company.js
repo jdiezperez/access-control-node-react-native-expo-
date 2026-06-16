@@ -27,7 +27,7 @@ try {
         password TEXT,
         creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         company_id INTEGER,
-        FOREIGN KEY(company_id) REFERENCES company(id)
+        FOREIGN KEY(company_id) REFERENCES companies(id)
       )
     `);
     

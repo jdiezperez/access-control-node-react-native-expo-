@@ -10,7 +10,7 @@ db.pragma('journal_mode = WAL');
 
 // Initialize tables
 db.exec(`
-  CREATE TABLE IF NOT EXISTS company (
+  CREATE TABLE IF NOT EXISTS companies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     logo TEXT,
@@ -36,7 +36,7 @@ db.exec(`
     password TEXT,
     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     company_id INTEGER,
-    FOREIGN KEY(company_id) REFERENCES company(id)
+    FOREIGN KEY(company_id) REFERENCES companies(id)
   );
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_one_admin_per_company ON users (company_id) WHERE type = 'admin';
@@ -52,7 +52,7 @@ db.exec(`
     status TEXT DEFAULT 'not active' CHECK(status IN ('not active', 'active', 'completed')),
     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     company_id INTEGER,
-    FOREIGN KEY(company_id) REFERENCES company(id)
+    FOREIGN KEY(company_id) REFERENCES companies(id)
   );
 
   CREATE TABLE IF NOT EXISTS sponsors (
@@ -66,7 +66,7 @@ db.exec(`
     contact_phone TEXT,
     country TEXT,
     company_id INTEGER,
-    FOREIGN KEY(company_id) REFERENCES company(id)
+    FOREIGN KEY(company_id) REFERENCES companies(id)
   );
 
   CREATE TABLE IF NOT EXISTS events_sponsors (
@@ -126,9 +126,9 @@ const bcrypt = require('bcrypt');
 const adminCount = db.prepare('SELECT COUNT(*) as count FROM users WHERE type = ?').get('admin');
 if (adminCount.count === 0) {
   const hashedPassword = bcrypt.hashSync('admin', 10);
-  let company = db.prepare('SELECT id FROM company LIMIT 1').get();
+  let company = db.prepare('SELECT id FROM companies LIMIT 1').get();
   if (!company) {
-    const info = db.prepare("INSERT INTO company (name) VALUES ('Default Company')").run();
+    const info = db.prepare("INSERT INTO companies (name) VALUES ('Default Company')").run();
     company = { id: info.lastInsertRowid };
   }
   db.prepare('INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(

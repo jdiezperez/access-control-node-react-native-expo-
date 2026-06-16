@@ -56,7 +56,13 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                 country: companyToEdit.country || '',
                 logo: companyToEdit.logo || '',
             });
-            setAdminForm({ ...defaultAdminForm });
+            setAdminForm({
+                name: companyToEdit.admin.name || '',
+                surname: companyToEdit.admin.surname || '',
+                email: companyToEdit.admin.email || '',
+                password: '',
+                confirmPassword: '',
+            });
         } else {
             setCompanyForm({ ...defaultCompanyForm });
             setAdminForm({ ...defaultAdminForm });
@@ -110,7 +116,7 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
         e.preventDefault();
         setError(null);
 
-        if (!isEditMode) {
+        if (!isEditMode || adminForm.password || adminForm.confirmPassword) {
             if (!adminForm.password || adminForm.password !== adminForm.confirmPassword) {
                 setError("Admin passwords don't match or are empty");
                 return;
@@ -119,31 +125,36 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                 setError('Admin password must be at least 6 characters');
                 return;
             }
-        }
+        } 
 
         try {
             setLoading(true);
+            const companyUserData = {
+                ...companyForm,
+                admin: {
+                    name: adminForm.name,
+                    surname: adminForm.surname,
+                    email: adminForm.email,
+                    password: adminForm.password,
+                }
+            };
             if (isEditMode) {
-                await axios.put(`/api/superadmin/companies/${companyToEdit.id}`, companyForm, {
+                await axios.put(`/api/superadmin/companies/${companyToEdit.id}`, companyUserData, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
             } else {
-                await axios.post('/api/superadmin/companies', {
-                    ...companyForm,
-                    admin: {
-                        name: adminForm.name,
-                        surname: adminForm.surname,
-                        email: adminForm.email,
-                        password: adminForm.password,
-                    },
-                }, {
+                await axios.post('/api/superadmin/companies', companyUserData, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
             }
             onSave();
             onClose();
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to save company');
+        } catch (err: unknown) {
+            if (axios.isAxiosError(err)) {
+                setError(err.response?.data?.message || 'Failed to update company');
+            } else {
+                setError('Failed to update company');
+            }
         } finally {
             setLoading(false);
         }
@@ -330,101 +341,98 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                         </div>
                     </div>
 
-                    {/* Admin Account — create mode only */}
-                    {!isEditMode && (
-                        <div>
-                            <div className="flex items-center gap-2 mb-4">
-                                <ShieldCheck size={16} className="text-violet-500" />
-                                <h3 className="font-black text-slate-700 uppercase text-xs tracking-widest">Admin Account</h3>
-                                <div className="flex-1 h-px bg-slate-100" />
+                    <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <ShieldCheck size={16} className="text-violet-500" />
+                            <h3 className="font-black text-slate-700 uppercase text-xs tracking-widest">Admin Account</h3>
+                            <div className="flex-1 h-px bg-slate-100" />
+                        </div>
+                        <p className="text-xs text-slate-400 mb-4">This user will be the administrator for the new company.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label className={labelClass}>First Name *</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        required
+                                        type="text"
+                                        value={adminForm.name}
+                                        onChange={e => setAdminForm({ ...adminForm, name: e.target.value })}
+                                        placeholder="John"
+                                        className={inputClass + ' pl-10'}
+                                    />
+                                </div>
                             </div>
-                            <p className="text-xs text-slate-400 mb-4">This user will be the administrator for the new company.</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div>
-                                    <label className={labelClass}>First Name *</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                                        <input
-                                            required
-                                            type="text"
-                                            value={adminForm.name}
-                                            onChange={e => setAdminForm({ ...adminForm, name: e.target.value })}
-                                            placeholder="John"
-                                            className={inputClass + ' pl-10'}
-                                        />
-                                    </div>
+                            <div>
+                                <label className={labelClass}>Last Name *</label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        required
+                                        type="text"
+                                        value={adminForm.surname}
+                                        onChange={e => setAdminForm({ ...adminForm, surname: e.target.value })}
+                                        placeholder="Doe"
+                                        className={inputClass + ' pl-10'}
+                                    />
                                 </div>
+                            </div>
 
-                                <div>
-                                    <label className={labelClass}>Last Name *</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                                        <input
-                                            required
-                                            type="text"
-                                            value={adminForm.surname}
-                                            onChange={e => setAdminForm({ ...adminForm, surname: e.target.value })}
-                                            placeholder="Doe"
-                                            className={inputClass + ' pl-10'}
-                                        />
-                                    </div>
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>Admin Email *</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        required
+                                        type="email"
+                                        value={adminForm.email}
+                                        onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
+                                        placeholder="admin@company.com"
+                                        className={inputClass + ' pl-10'}
+                                    />
                                 </div>
+                            </div>
 
-                                <div className="md:col-span-2">
-                                    <label className={labelClass}>Admin Email *</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                                        <input
-                                            required
-                                            type="email"
-                                            value={adminForm.email}
-                                            onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
-                                            placeholder="admin@company.com"
-                                            className={inputClass + ' pl-10'}
-                                        />
-                                    </div>
+                            <div>
+                                <label className={labelClass}>Password {isEditMode ? '' : '*'}</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        required={isEditMode ? false : true}
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={adminForm.password}
+                                        onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
+                                        placeholder="Min. 6 characters"
+                                        className={inputClass + ' pl-10 pr-10'}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
                                 </div>
+                            </div>
 
-                                <div>
-                                    <label className={labelClass}>Password *</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                                        <input
-                                            required
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={adminForm.password}
-                                            onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
-                                            placeholder="Min. 6 characters"
-                                            className={inputClass + ' pl-10 pr-10'}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                        >
-                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className={labelClass}>Confirm Password *</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                                        <input
-                                            required
-                                            type="password"
-                                            value={adminForm.confirmPassword}
-                                            onChange={e => setAdminForm({ ...adminForm, confirmPassword: e.target.value })}
-                                            placeholder="Repeat password"
-                                            className={inputClass + ' pl-10'}
-                                        />
-                                    </div>
+                            <div>
+                                <label className={labelClass}>Confirm Password {isEditMode ? '' : '*'}</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        required={isEditMode ? false : true}
+                                        type="password"
+                                        value={adminForm.confirmPassword}
+                                        onChange={e => setAdminForm({ ...adminForm, confirmPassword: e.target.value })}
+                                        placeholder="Repeat password"
+                                        className={inputClass + ' pl-10'}
+                                    />
                                 </div>
                             </div>
                         </div>
-                    )}
+                    </div>
 
                     {/* Footer Actions */}
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">

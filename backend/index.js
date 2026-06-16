@@ -61,7 +61,7 @@ const isManagerOrAdmin = (req, res, next) => {
 
 const isStaff = (req, res, next) => {
 	if (req.user.type !== 'admin' && req.user.type !== 'user' && req.user.type !== 'manager') {
-		return res.status(403).json({ message: 'Mobile access denied' });
+		return res.status(403).json({ message: 'Access denied' });
 	}
 	next();
 };
@@ -73,18 +73,9 @@ const isSuperAdmin = (req, res, next) => {
 	next();
 };
 
-app.post('/api/admin/upload', authenticateToken, isManagerOrAdmin, upload.single('image'), (req, res) => {
-	if (!req.file) {
-		console.log('Upload failed: No file in request');
-		return res.status(400).json({ message: 'No file uploaded' });
-	}
-	const folder = req.query.folder || 'general';
-	const url = `/uploads/${folder}/${req.file.filename}`;
-	console.log('File uploaded successfully:', url);
-	res.json({ url });
-});
+// ─── Superadmin Routes ───────────────────────────────────────────────────────
 
-// Superadmin upload route (for company logos)
+// POST Superadmin upload route (for company logos)
 app.post('/api/superadmin/upload', authenticateToken, isSuperAdmin, upload.single('image'), (req, res) => {
 	if (!req.file) {
 		return res.status(400).json({ message: 'No file uploaded' });
@@ -94,7 +85,169 @@ app.post('/api/superadmin/upload', authenticateToken, isSuperAdmin, upload.singl
 	res.json({ url });
 });
 
-// Auth Routes
+// GET all companies (with stats)
+/*
+app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
+	const companies = db.prepare(`
+		SELECT 
+			c.*,
+			COUNT(DISTINCT CASE WHEN u.type != 'guest' THEN u.id END) as user_count,
+			COUNT(DISTINCT e.id) as event_count
+		FROM companies c
+		LEFT JOIN users u ON u.company_id = c.id
+		LEFT JOIN events e ON e.company_id = c.id
+		GROUP BY c.id
+		ORDER BY c.name ASC
+	`).all();
+	res.json(companies);
+});
+*/
+app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
+	const companies = db.prepare(`
+		SELECT
+			c.*,
+			COUNT(DISTINCT CASE WHEN u.type != 'guest' THEN u.id END) AS user_count,
+			COUNT(DISTINCT e.id) AS event_count
+		FROM companies c
+		LEFT JOIN users u ON u.company_id = c.id
+		LEFT JOIN events e ON e.company_id = c.id
+		GROUP BY c.id
+		ORDER BY c.name ASC
+	`).all();
+
+	const admins = db.prepare(`
+		SELECT
+			id,
+			company_id,
+			name,
+			surname,
+			email
+		FROM users
+		WHERE type = 'admin'
+	`).all();
+
+	const companiesWithAdmin = companies.map(company => ({
+		...company,
+		admin: admins.find(admin => admin.company_id === company.id) || null,
+	}));
+
+	res.json(companiesWithAdmin);
+});
+
+// GET single company
+app.get('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
+	const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
+	if (!company) return res.status(404).json({ message: 'Company not found' });
+	res.json(company);
+});
+
+// POST create company + initial admin user
+app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
+	const { name, logo, address, email, phone, city, country, admin } = req.body;
+
+	if (!name) return res.status(400).json({ message: 'Company name is required' });
+	if (!admin || !admin.name || !admin.surname || !admin.email || !admin.password) {
+		return res.status(400).json({ message: 'Admin user details (name, surname, email, password) are required' });
+	}
+
+	const createCompanyAndAdmin = db.transaction(() => {
+		const companyInfo = db.prepare(
+			'INSERT INTO companies (name, logo, address, email, phone, city, country) VALUES (?, ?, ?, ?, ?, ?, ?)'
+		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null);
+
+		const companyId = companyInfo.lastInsertRowid;
+		const hashedPassword = bcrypt.hashSync(admin.password, 10);
+
+		const userInfo = db.prepare(
+			'INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)'
+		).run(admin.name, admin.surname, admin.email, hashedPassword, 'admin', companyId);
+
+		return { companyId, adminId: userInfo.lastInsertRowid };
+	});
+
+	try {
+		const result = createCompanyAndAdmin();
+		res.json({ success: true, companyId: result.companyId, adminId: result.adminId });
+	} catch (err) {
+		console.error('Error creating company:', err);
+		res.status(400).json({ message: err.message || 'Failed to create company' });
+	}
+});
+
+// PUT update company info
+app.put('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
+	const { name, logo, address, email, phone, city, country, admin } = req.body;
+	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.params.id);
+	if (!company) return res.status(404).json({ message: 'Company not found' });
+	const adminUser = db.prepare('SELECT id FROM users WHERE company_id = ? and type = ?').get([req.params.id, 'admin']);
+	if (!adminUser) return res.status(404).json({ message: 'Admin user not found' });
+
+    const updateCompanyAndAdmin = db.transaction(() => {
+		db.prepare(
+			'UPDATE companies SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?'
+		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null, req.params.id);
+
+        if (admin.password && admin.password.length > 0) {
+            const hashedPassword = bcrypt.hashSync(admin.password, 10);
+	    	db.prepare(
+		    	'UPDATE users SET name = ?, surname = ?, email = ?, password = ? WHERE id = ?'
+		    ).run(admin.name, admin.surname, admin.email, hashedPassword, adminUser.id);
+        } else {
+            db.prepare(
+		    	'UPDATE users SET name = ?, surname = ?, email = ? WHERE id = ?'
+		    ).run(admin.name, admin.surname, admin.email, adminUser.id);
+        }
+        return { success: true };
+    });
+
+	try {
+		const result = updateCompanyAndAdmin();
+        res.json(result);
+	} catch (err) {
+		res.status(400).json({ message: 'Update failed: ' + err.message });
+	}
+});
+
+// DELETE company + all associated data
+app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
+	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.params.id);
+	if (!company) return res.status(404).json({ message: 'Company not found' });
+
+	const deleteAll = db.transaction(() => {
+		// events_guests and events_sponsors are cascade deleted via FK when events/users are deleted
+		// But let's be explicit for safety
+		const eventIds = db.prepare('SELECT id FROM events WHERE company_id = ?').all(req.params.id).map(e => e.id);
+		if (eventIds.length > 0) {
+			const placeholders = eventIds.map(() => '?').join(',');
+			db.prepare(`DELETE FROM events_guests WHERE event_id IN (${placeholders})`).run(...eventIds);
+			db.prepare(`DELETE FROM events_sponsors WHERE event_id IN (${placeholders})`).run(...eventIds);
+		}
+
+		db.prepare('DELETE FROM events WHERE company_id = ?').run(req.params.id);
+		db.prepare('DELETE FROM sponsors WHERE company_id = ?').run(req.params.id);
+		db.prepare('DELETE FROM users WHERE company_id = ?').run(req.params.id);
+		db.prepare('DELETE FROM companies WHERE id = ?').run(req.params.id);
+	});
+
+	try {
+		deleteAll();
+		res.json({ success: true });
+	} catch (err) {
+		console.error('Error deleting company:', err);
+		res.status(500).json({ message: 'Delete failed: ' + err.message });
+	}
+});
+
+// GET users of a specific company (for superadmin view)
+app.get('/api/superadmin/companies/:id/users', authenticateToken, isSuperAdmin, (req, res) => {
+	const users = db.prepare(
+		'SELECT id, name, surname, email, type, role, creation_date FROM users WHERE company_id = ? AND type != ? ORDER BY type ASC'
+	).all(req.params.id, 'guest');
+	res.json(users);
+});
+
+// ─── Auth Routes ───────────────────────────────────────────────────────
+
 app.post('/api/auth/login', (req, res) => {
 	const { email, password } = req.body;
 	const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -111,6 +264,8 @@ app.post('/api/auth/login', (req, res) => {
 	res.json({ token, user: { id: user.id, name: user.name, surname: user.surname, email: user.email, role: user.role, gender: user.gender, type: user.type, company_id: user.company_id } });
 });
 
+// ─── Guests Routes ───────────────────────────────────────────────────────
+
 // Upload Route
 app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
 	if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -119,28 +274,45 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => 
 	res.json({ url });
 });
 
-// Admin Routes - Company
-// GET: managers & admins can read company info (needed for logo, org name)
-app.get('/api/admin/company', authenticateToken, isAdmin, (req, res) => {
-	const company = db.prepare('SELECT * FROM company WHERE id = ?').get(req.user.company_id);
+// ─── Admin Routes ───────────────────────────────────────────────────────
+
+// Upload image
+app.post('/api/admin/upload', authenticateToken, isManagerOrAdmin, upload.single('image'), (req, res) => {
+	if (!req.file) {
+		console.log('Upload failed: No file in request');
+		return res.status(400).json({ message: 'No file uploaded' });
+	}
+	const folder = req.query.folder || 'general';
+	const url = `/uploads/${folder}/${req.file.filename}`;
+	console.log('File uploaded successfully:', url);
+	res.json({ url });
+});
+
+// GET Company info for the logged-in user
+app.get('/api/admin/companies', authenticateToken, isStaff, (req, res) => {
+    console.log('Fetching company info for user:', req.user);
+	const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.user.company_id);
 	res.json(company || {});
 });
 
-app.post('/api/admin/company', authenticateToken, isAdmin, (req, res) => {
+// PUT update company info for the logged-in user
+app.put('/api/admin/companies', authenticateToken, isStaff, (req, res) => {
 	const { name, logo, address, email, phone, city, country } = req.body;
-	const existing = db.prepare('SELECT id FROM company WHERE id = ?').get(req.user.company_id);
-	if (existing) {
-		db.prepare('UPDATE company SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?')
-			.run(name, logo, address, email, phone, city, country, req.user.company_id);
-	} else {
-		db.prepare('INSERT INTO company (id, name, logo, address, email, phone, city, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-			.run(req.user.company_id, name, logo, address, email, phone, city, country);
+	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.user.company_id);
+	if (!company) return res.status(404).json({ message: 'Company not found' });
+
+	try {
+		db.prepare(
+			'UPDATE companies SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?'
+		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null, req.user.company_id);
+		res.json({ success: true });
+	} catch (err) {
+		res.status(400).json({ message: 'Update failed: ' + err.message });
 	}
-	res.json({ success: true });
 });
 
-// Admin Routes - Users (Admins & Guests)
-app.get('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
+// GET Users (Admins & Guests)
+app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const type = req.query.type;
 	let users;
 	if (type) {
@@ -151,27 +323,17 @@ app.get('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
 	res.json(users);
 });
 
-app.post('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
+// POST Create User (Managers & Guests)
+app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const { name, surname, email, type, password, city, country, organization, role, gender } = req.body;
 
-	// Validation: manager cannot create/promote admin
-
-	/**** DELETE 
-	if (req.user.type === 'manager' && type === 'admin') {
-		return res.status(403).json({ message: 'Managers cannot create admin users' });
-	}
-	*/
-
-	if (req.user.type === 'admin' && type === 'superadmin') {
-		return res.status(403).json({ message: 'Admins cannot create superadmin users' });
+	// Validation: manager cannot create/promote admin or superadmin
+	if (type === 'superadmin') {
+		return res.status(403).json({ message: 'SuperAdmin users cannot be created' });
 	}
 
-	// Validation: one admin per company
 	if (type === 'admin') {
-		const existingAdmin = db.prepare('SELECT id FROM users WHERE type = ? AND company_id = ?').get('admin', req.user.company_id);
-		if (existingAdmin) {
-			return res.status(400).json({ message: 'There can only be one admin user per company.' });
-		}
+		return res.status(403).json({ message: 'Admin users cannot be created by Managers or Admins' });
 	}
 
 	const hashedPassword = password ? bcrypt.hashSync(password, 10) : null;
@@ -191,6 +353,7 @@ app.post('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
 	}
 });
 
+// PUT Update User (Managers & Guests)
 app.put('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 	const { name, surname, email, type, city, country, organization, role, gender, image } = req.body;
 
@@ -1136,118 +1299,6 @@ app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
 });
 
 // ─── Superadmin Routes ───────────────────────────────────────────────────────
-
-// GET all companies (with stats)
-app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
-	const companies = db.prepare(`
-		SELECT 
-			c.*,
-			COUNT(DISTINCT CASE WHEN u.type != 'guest' THEN u.id END) as user_count,
-			COUNT(DISTINCT e.id) as event_count
-		FROM company c
-		LEFT JOIN users u ON u.company_id = c.id
-		LEFT JOIN events e ON e.company_id = c.id
-		GROUP BY c.id
-		ORDER BY c.name ASC
-	`).all();
-	res.json(companies);
-});
-
-// GET single company
-app.get('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
-	const company = db.prepare('SELECT * FROM company WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-	res.json(company);
-});
-
-// POST create company + initial admin user
-app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
-	const { name, logo, address, email, phone, city, country, admin } = req.body;
-
-	if (!name) return res.status(400).json({ message: 'Company name is required' });
-	if (!admin || !admin.name || !admin.surname || !admin.email || !admin.password) {
-		return res.status(400).json({ message: 'Admin user details (name, surname, email, password) are required' });
-	}
-
-	const createCompanyAndAdmin = db.transaction(() => {
-		const companyInfo = db.prepare(
-			'INSERT INTO company (name, logo, address, email, phone, city, country) VALUES (?, ?, ?, ?, ?, ?, ?)'
-		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null);
-
-		const companyId = companyInfo.lastInsertRowid;
-		const hashedPassword = bcrypt.hashSync(admin.password, 10);
-
-		const userInfo = db.prepare(
-			'INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)'
-		).run(admin.name, admin.surname, admin.email, hashedPassword, 'admin', companyId);
-
-		return { companyId, adminId: userInfo.lastInsertRowid };
-	});
-
-	try {
-		const result = createCompanyAndAdmin();
-		res.json({ success: true, companyId: result.companyId, adminId: result.adminId });
-	} catch (err) {
-		console.error('Error creating company:', err);
-		res.status(400).json({ message: err.message || 'Failed to create company' });
-	}
-});
-
-// PUT update company info
-app.put('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
-	const { name, logo, address, email, phone, city, country } = req.body;
-	const company = db.prepare('SELECT id FROM company WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-
-	try {
-		db.prepare(
-			'UPDATE company SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?'
-		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null, req.params.id);
-		res.json({ success: true });
-	} catch (err) {
-		res.status(400).json({ message: 'Update failed: ' + err.message });
-	}
-});
-
-// DELETE company + all associated data
-app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
-	const company = db.prepare('SELECT id FROM company WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-
-	const deleteAll = db.transaction(() => {
-		// events_guests and events_sponsors are cascade deleted via FK when events/users are deleted
-		// But let's be explicit for safety
-		const eventIds = db.prepare('SELECT id FROM events WHERE company_id = ?').all(req.params.id).map(e => e.id);
-		if (eventIds.length > 0) {
-			const placeholders = eventIds.map(() => '?').join(',');
-			db.prepare(`DELETE FROM events_guests WHERE event_id IN (${placeholders})`).run(...eventIds);
-			db.prepare(`DELETE FROM events_sponsors WHERE event_id IN (${placeholders})`).run(...eventIds);
-		}
-
-		db.prepare('DELETE FROM events WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM sponsors WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM users WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM company WHERE id = ?').run(req.params.id);
-	});
-
-	try {
-		deleteAll();
-		res.json({ success: true });
-	} catch (err) {
-		console.error('Error deleting company:', err);
-		res.status(500).json({ message: 'Delete failed: ' + err.message });
-	}
-});
-
-// GET users of a specific company (for superadmin view)
-app.get('/api/superadmin/companies/:id/users', authenticateToken, isSuperAdmin, (req, res) => {
-	const users = db.prepare(
-		'SELECT id, name, surname, email, type, role, creation_date FROM users WHERE company_id = ? AND type != ? ORDER BY type ASC'
-	).all(req.params.id, 'guest');
-	res.json(users);
-});
-
-// Start server
 app.listen(PORT, () => {
 	console.log(`Server running on http://localhost:${PORT}`);
 });
