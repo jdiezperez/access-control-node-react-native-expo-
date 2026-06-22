@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, GripVertical, ChevronDown, Loader2 } from 'lucide-react';
+import { Plus, X, GripVertical, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import FieldTypeSelector from './FieldTypeSelector';
 
@@ -18,7 +18,7 @@ interface EventFieldsBuilderProps {
 	refreshTrigger?: number;
 }
 
-const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, onFieldsSaved, refreshTrigger = 0 }) => {
+const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refreshTrigger = 0 }) => {
 	const token = localStorage.getItem('token');
 	const [fields, setFields] = useState<Field[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -223,7 +223,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, onFiel
 						<p className="text-sm">No custom fields yet</p>
 					</div>
 				) : (
-					fields.map((field, index) => (
+					fields.map((field) => (
 						<div
 							key={field.id}
 							draggable

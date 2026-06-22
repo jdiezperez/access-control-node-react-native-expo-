@@ -293,92 +293,194 @@ const EventsGuests = () => {
                         <p className="text-slate-400">No guests invited to this event or matching your filters.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-black/10 border-b border-white/5">
-                                <tr>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Image</th>
-                                    {['name', 'surname', 'role', 'organization', 'city', 'country', 'gender', 'email', 'invited', 'accepted', 'attended'].map(field => (
-                                        <th
-                                            key={field}
-                                            onClick={() => handleSort(field as keyof Guest)}
-                                            className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                {field.replace('_', ' ')}
-                                                {sortField === field && (
-                                                    sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                )}
+                    <>
+                        {/* Desktop Table View */}
+                        <div className="hidden lg:block overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-black/10 border-b border-white/5">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Image</th>
+                                        {['name', 'surname', 'role', 'organization', 'city', 'country', 'gender', 'email', 'invited', 'accepted', 'attended'].map(field => (
+                                            <th
+                                                key={field}
+                                                onClick={() => handleSort(field as keyof Guest)}
+                                                className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    {field.replace('_', ' ')}
+                                                    {sortField === field && (
+                                                        sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                    )}
+                                                </div>
+                                            </th>
+                                        ))}
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {filteredGuests.map(guest => {
+                                        const canShowBadge = guest.accepted && !!guest.accepted_date;
+                                        const isSendingInvite = invitingGuestId === guest.id;
+                                        return (
+                                            <tr key={guest.id} className="hover:bg-white/5 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="w-9 h-9 rounded-full bg-white border border-white/10 flex items-center justify-center overflow-hidden">
+                                                        {guest.image
+                                                            ? <img src={guest.image} alt={guest.name} className="w-full h-full object-cover" />
+                                                            : <User size={16} className="text-slate-400" />}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.name}</td>
+                                                <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.surname}</td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.role || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.organization || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.city || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.country || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.gender || '-'}</td>
+                                                <td className="px-6 py-4 text-slate-300 text-sm">{guest.email}</td>
+                                                <td className="px-6 py-4">{renderBooleanCell(guest.invited, guest.invited_date)}</td>
+                                                <td className="px-6 py-4">{renderBooleanCell(guest.accepted, guest.accepted_date)}</td>
+                                                <td className="px-6 py-4">{renderBooleanCell(guest.attended, guest.attended_date)}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {/* Invite single */}
+                                                        <button
+                                                            onClick={() => handleInviteSingle(guest)}
+                                                            disabled={isSendingInvite || !canInviteAll || guest.accepted}
+                                                            title={guest.accepted ? 'Guest already accepted the invitation' : canInviteAll ? `Send invitation to ${guest.name}` : 'Event must be Active with an email template'}
+                                                            className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        >
+                                                            {isSendingInvite
+                                                                ? <Loader2 size={16} className="animate-spin" />
+                                                                : <Mail size={16} />}
+                                                        </button>
+
+                                                        {/* QR Badge */}
+                                                        <button
+                                                            onClick={() => canShowBadge && setBadgeGuest(guest)}
+                                                            disabled={!canShowBadge}
+                                                            title={canShowBadge ? 'Show badge & QR code' : 'Guest must have accepted the invitation'}
+                                                            className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        >
+                                                            <QrCode size={16} />
+                                                        </button>
+
+                                                        {/* Remove */}
+                                                        <button
+                                                            onClick={() => handleRemoveGuest(guest.id)}
+                                                            title="Remove from event"
+                                                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
+                                                        >
+                                                            <Unlink size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile/Tablet Card View */}
+                        <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                            {filteredGuests.map(guest => {
+                                const canShowBadge = guest.accepted && !!guest.accepted_date;
+                                const isSendingInvite = invitingGuestId === guest.id;
+                                return (
+                                    <div key={guest.id} className="rounded-2xl border border-white/10 p-5 flex flex-col gap-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-white border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                                                {guest.image
+                                                    ? <img src={guest.image} alt={guest.name} className="w-full h-full object-cover" />
+                                                    : <User size={20} className="text-slate-400" />}
                                             </div>
-                                        </th>
-                                    ))}
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {filteredGuests.map(guest => {
-                                    const canShowBadge = guest.accepted && !!guest.accepted_date;
-                                    const isSendingInvite = invitingGuestId === guest.id;
-                                    return (
-                                        <tr key={guest.id} className="hover:bg-white/5 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="w-9 h-9 rounded-full bg-white border border-white/10 flex items-center justify-center overflow-hidden">
-                                                    {guest.image
-                                                        ? <img src={guest.image} alt={guest.name} className="w-full h-full object-cover" />
-                                                        : <User size={16} className="text-slate-400" />}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.name}</td>
-                                            <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.surname}</td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.role || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.organization || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.city || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.country || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.gender || '-'}</td>
-                                            <td className="px-6 py-4 text-slate-300 text-sm">{guest.email}</td>
-                                            <td className="px-6 py-4">{renderBooleanCell(guest.invited, guest.invited_date)}</td>
-                                            <td className="px-6 py-4">{renderBooleanCell(guest.accepted, guest.accepted_date)}</td>
-                                            <td className="px-6 py-4">{renderBooleanCell(guest.attended, guest.attended_date)}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {/* Invite single */}
-                                                    <button
-                                                        onClick={() => handleInviteSingle(guest)}
-                                                        disabled={isSendingInvite || !canInviteAll || guest.accepted}
-                                                        title={guest.accepted ? 'Guest already accepted the invitation' : canInviteAll ? `Send invitation to ${guest.name}` : 'Event must be Active with an email template'}
-                                                        className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                                    >
-                                                        {isSendingInvite
-                                                            ? <Loader2 size={16} className="animate-spin" />
-                                                            : <Mail size={16} />}
-                                                    </button>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-bold text-white text-base capitalize truncate">{guest.name} {guest.surname}</h3>
+                                                <p className="text-xs text-slate-400 truncate mt-0.5">{guest.email}</p>
+                                                <p className="text-xs text-slate-300 font-semibold mt-1 capitalize">{guest.role || 'No Role'} • {guest.organization || 'No Organization'}</p>
+                                            </div>
+                                        </div>
 
-                                                    {/* QR Badge */}
-                                                    <button
-                                                        onClick={() => canShowBadge && setBadgeGuest(guest)}
-                                                        disabled={!canShowBadge}
-                                                        title={canShowBadge ? 'Show badge & QR code' : 'Guest must have accepted the invitation'}
-                                                        className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                                    >
-                                                        <QrCode size={16} />
-                                                    </button>
-
-                                                    {/* Remove */}
-                                                    <button
-                                                        onClick={() => handleRemoveGuest(guest.id)}
-                                                        title="Remove from event"
-                                                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
-                                                    >
-                                                        <Unlink size={16} />
-                                                    </button>
+                                        {/* Badges Info */}
+                                        <div className="grid grid-cols-3 gap-2 border-y border-white/5 py-3">
+                                            <div className="text-center">
+                                                <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Invited</span>
+                                                <div className="flex flex-col items-center justify-center min-h-[32px]">
+                                                    {guest.invited ? (
+                                                        <>
+                                                            <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-bold">Yes</span>
+                                                            {guest.invited_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.invited_date).toLocaleDateString()}</span>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[10px] bg-white/5 text-slate-500 px-2 py-0.5 rounded border border-white/5 font-bold">No</span>
+                                                    )}
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Accepted</span>
+                                                <div className="flex flex-col items-center justify-center min-h-[32px]">
+                                                    {guest.accepted ? (
+                                                        <>
+                                                            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">Yes</span>
+                                                            {guest.accepted_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.accepted_date).toLocaleDateString()}</span>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[10px] bg-white/5 text-slate-500 px-2 py-0.5 rounded border border-white/5 font-bold">No</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Attended</span>
+                                                <div className="flex flex-col items-center justify-center min-h-[32px]">
+                                                    {guest.attended ? (
+                                                        <>
+                                                            <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20 font-bold">Yes</span>
+                                                            {guest.attended_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.attended_date).toLocaleDateString()}</span>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[10px] bg-white/5 text-slate-500 px-2 py-0.5 rounded border border-white/5 font-bold">No</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Location & Details */}
+                                        <div className="text-xs text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                                            <span><strong>Location:</strong> {guest.city || '-'}{guest.city && guest.country ? ', ' : ''}{guest.country || ''}</span>
+                                            <span><strong>Gender:</strong> <span className="capitalize">{guest.gender || '-'}</span></span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                                            <button
+                                                onClick={() => handleInviteSingle(guest)}
+                                                disabled={isSendingInvite || !canInviteAll || guest.accepted}
+                                                className="flex-1 max-w-[120px] flex items-center justify-center gap-2 py-2 border border-white/10 rounded-xl hover:text-white hover:bg-white/5 transition-all text-xs font-semibold text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                {isSendingInvite ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                                                Invite
+                                            </button>
+                                            <button
+                                                onClick={() => canShowBadge && setBadgeGuest(guest)}
+                                                disabled={!canShowBadge}
+                                                className="flex-1 max-w-[120px] flex items-center justify-center gap-2 py-2 border border-white/10 rounded-xl hover:text-white hover:bg-white/5 transition-all text-xs font-semibold text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                <QrCode size={12} />
+                                                Badge
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemoveGuest(guest.id)}
+                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all ml-auto"
+                                            >
+                                                <Unlink size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
                 )}
             </div>
 

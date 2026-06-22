@@ -75,7 +75,7 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
         if (selectedIds.length === 0) return;
         try {
             setError(null);
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests`, { userIds: selectedIds }, {
+            await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests`, { guestIds: selectedIds }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             onAdded();
@@ -94,19 +94,10 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
         try {
             setSaving(true);
             setError(null);
-            // 1. Create the user
-            const userRes = await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
-                ...newGuest,
-                type: 'guest'
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const newUserId = userRes.data.id;
-
-            // 2. Add to event
-            await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests`, {
-                userIds: [newUserId]
+            
+            // Send guest data directly to the event endpoint to populate guestdata
+            await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests/create`, {
+                guestData: newGuest
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -173,7 +164,7 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                 />
                             </div>
 
-                            <div className="border rounded-xl overflow-hidden">
+                            <div className="border rounded-xl overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50">
                                         <tr>

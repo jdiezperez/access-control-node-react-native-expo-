@@ -28,40 +28,40 @@ const EventEdit = () => {
 	const isNew = id === 'new' || !id;
 	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
-    const state = location.state as { tab?: string } | null;
-    console.log('Location state:', state);
-    const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() =>	state?.tab === 'fields' && !isNew ? 'fields' : 'info'
-);
+	const state = location.state as { tab?: string } | null;
+	console.log('Location state:', state);
+	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
+	);
 
 	useEffect(() => {
-        const load = async () => {
-            if (id && id !== 'new') {
-                try {
-                    const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const currentEvent = res.data.find((e: {id: number}) => e.id === parseInt(id || '0'));
-                    if (currentEvent) {
-                        // Format date for input type="date"
-                        if (currentEvent.date) {
-                            currentEvent.date = new Date(currentEvent.date).toISOString().split('T')[0];
-                        }
-                        setEvent(currentEvent);
-                    } else {
-                        alert('Event not found');
-                        navigate('/admin');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert('Error fetching event');
-                } finally {
-                    setLoading(false);
-                }
-            } else {
-                setLoading(false);
-            }
-        };
-        load();
+		const load = async () => {
+			if (id && id !== 'new') {
+				try {
+					const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events`, {
+						headers: { Authorization: `Bearer ${token}` }
+					});
+					const currentEvent = res.data.find((e: { id: number }) => e.id === parseInt(id || '0'));
+					if (currentEvent) {
+						// Format date for input type="date"
+						if (currentEvent.date) {
+							currentEvent.date = new Date(currentEvent.date).toISOString().split('T')[0];
+						}
+						setEvent(currentEvent);
+					} else {
+						alert('Event not found');
+						navigate('/admin');
+					}
+				} catch (err) {
+					console.error(err);
+					alert('Error fetching event');
+				} finally {
+					setLoading(false);
+				}
+			} else {
+				setLoading(false);
+			}
+		};
+		load();
 	}, [id, navigate, token]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -140,24 +140,22 @@ const EventEdit = () => {
 				<div className="flex border-b border-white/10 bg-white/5">
 					<button
 						onClick={() => setActiveTab('info')}
-						className={`flex-1 px-6 py-4 text-sm font-semibold transition-all ${
-							activeTab === 'info'
+						className={`flex-1 px-6 py-4 text-sm font-semibold transition-all ${activeTab === 'info'
 								? 'text-white border-b-2 border-blue-500'
 								: 'text-slate-400 hover:text-slate-300'
-						}`}
+							}`}
 					>
 						Event Info
 					</button>
 					{!isNew && (
 						<button
 							onClick={() => setActiveTab('fields')}
-                            disabled={event.status !== 'not active'}
-                            title={event.status !== 'not active' ? 'Cannot edit Guest Data when event is Active or Completed' : ''}
-							className={`flex-1 px-6 py-4 text-sm font-semibold transition-all border-l border-white/10 ${
-								activeTab === 'fields'
+							disabled={event.status !== 'not active'}
+							title={event.status !== 'not active' ? 'Cannot edit Guest Data when event is Active or Completed' : ''}
+							className={`flex-1 px-6 py-4 text-sm font-semibold transition-all border-l border-white/10 ${activeTab === 'fields'
 									? 'text-white border-b-2 border-blue-500'
 									: 'text-slate-400 hover:text-slate-300'
-							} ${event.status !== 'not active' ? 'opacity-50 cursor-not-allowed' : ''}`}
+								} ${event.status !== 'not active' ? 'opacity-50 cursor-not-allowed' : ''}`}
 						>
 							Guest Data
 						</button>
@@ -168,206 +166,206 @@ const EventEdit = () => {
 					{activeTab === 'info' && (
 						<>
 							{/* Status Section */}
-					<div className="pb-4 border-b border-white/5">
-						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
-							<Tag size={14} className="text-primary" /> Event Status
-						</label>
-						<div className="flex flex-wrap gap-4">
-							{[
-								{ id: 'not active', label: 'Not Active', color: 'bg-white/10 text-slate-300 border-white/10', ring: 'ring-white/10' },
-								{ id: 'active', label: 'Active', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', ring: 'ring-emerald-500/20' },
-								{ id: 'completed', label: 'Completed', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', ring: 'ring-orange-500/20' }
-							].map((status) => (
-								<label
-									key={status.id}
-									className={`
+							<div className="pb-4 border-b border-white/5">
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+									<Tag size={14} className="text-primary" /> Event Status
+								</label>
+								<div className="flex flex-wrap gap-4">
+									{[
+										{ id: 'not active', label: 'Not Active', color: 'bg-white/10 text-slate-300 border-white/10', ring: 'ring-white/10' },
+										{ id: 'active', label: 'Active', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', ring: 'ring-emerald-500/20' },
+										{ id: 'completed', label: 'Completed', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', ring: 'ring-orange-500/20' }
+									].map((status) => (
+										<label
+											key={status.id}
+											className={`
 										relative flex items-center gap-3 px-4 py-2.5 rounded-2xl cursor-pointer transition-all border
 										${event.status === status.id
-											? `${status.color} ring-4 ${status.ring}`
-											: 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'}
+													? `${status.color} ring-4 ${status.ring}`
+													: 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'}
 									`}
-								>
-									<input
-										type="radio"
-										name="status"
-										value={status.id}
-										checked={event.status === status.id}
-										onChange={() => setEvent({ ...event, status: status.id })}
-										className="sr-only"
-									/>
-									<div className={`w-2.5 h-2.5 rounded-full ${event.status === status.id ? 'bg-current' : 'bg-slate-600'}`} />
-									<span className="font-bold text-sm tracking-tight">{status.label}</span>
-								</label>
-							))}
-						</div>
-					</div>
-
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-						{/* Name */}
-						<div className="space-y-2 col-span-2">
-							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-								<Tag size={14} className="text-primary" /> Event Name
-							</label>
-							<input
-								type="text"
-								name="name"
-								required
-								value={event.name}
-								onChange={handleChange}
-								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-								style={{ background: 'rgba(255,255,255,0.03)' }}
-							/>
-						</div>
-
-						{/* Logo Section */}
-						<div className="flex flex-col md:flex-row gap-8 items-start pb-6 border-b border-white/5">
-							<div className="w-32 h-32 bg-white rounded-3xl flex items-center justify-center overflow-hidden border border-white/10 p-2 shrink-0">
-								{event.logo ? (
-									<img src={getImagePath(event.logo, 'events')} alt="Event logo" className="w-full h-full object-contain" />
-								) : (
-									<ImageIcon size={40} className="text-slate-400" />
-								)}
-							</div>
-							<div className="flex-1 space-y-2 w-full">
-								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-									<ImageIcon size={14} className="text-primary" /> Event Logo
-								</label>
-								<div className="flex flex-col gap-2">
-									<input
-										type="file"
-										accept="image/*"
-										onChange={async (e) => {
-											const file = e.target.files?.[0];
-											if (!file) return;
-
-											const resizeImageToBlob = (file: File, maxWidth = 500): Promise<Blob> =>
-												new Promise((resolve, reject) => {
-													const img = new window.Image();
-													const url = URL.createObjectURL(file);
-													img.onload = () => {
-														URL.revokeObjectURL(url);
-														const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-														const canvas = document.createElement('canvas');
-														canvas.width = Math.round(img.width * scale);
-														canvas.height = Math.round(img.height * scale);
-														canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-														canvas.toBlob(
-															blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
-															'image/jpeg',
-															0.85
-														);
-													};
-													img.onerror = reject;
-													img.src = url;
-												});
-
-											try {
-												setUploading(true);
-												const resized = await resizeImageToBlob(file);
-												const formData = new FormData();
-												formData.append('file', resized, file.name.replace(/\.[^.]+$/, '.jpg'));
-
-												const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload?folder=events`, formData, {
-													headers: {
-														'Content-Type': 'multipart/form-data',
-														Authorization: `Bearer ${token}`
-													}
-												});
-												setEvent({ ...event, logo: res.data.url });
-											} catch (err: unknown) {
-												alert('Error uploading image, ' + (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (err as { message?: string }).message);
-											} finally {
-												setUploading(false);
-											}
-										}}
-										className="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-primary file:text-white hover:file:opacity-90 file:cursor-pointer"
-									/>
-									{uploading && <p className="text-xs text-primary animate-pulse">Uploading...</p>}
-									<p className="text-xs text-slate-500 italic">Select an image to upload as the event logo (PNG, square image). Resized to 500px wide.</p>
+										>
+											<input
+												type="radio"
+												name="status"
+												value={status.id}
+												checked={event.status === status.id}
+												onChange={() => setEvent({ ...event, status: status.id })}
+												className="sr-only"
+											/>
+											<div className={`w-2.5 h-2.5 rounded-full ${event.status === status.id ? 'bg-current' : 'bg-slate-600'}`} />
+											<span className="font-bold text-sm tracking-tight">{status.label}</span>
+										</label>
+									))}
 								</div>
 							</div>
-						</div>
 
-						{/* Date */}
-						<div className="space-y-2">
-							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-								<Calendar size={14} className="text-primary" /> Date
-							</label>
-							<input
-								type="date"
-								name="date"
-								value={event.date || ''}
-								onChange={handleChange}
-								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-								style={{ background: 'rgba(255,255,255,0.03)' }}
-							/>
-						</div>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								{/* Name */}
+								<div className="space-y-2 col-span-2">
+									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+										<Tag size={14} className="text-primary" /> Event Name
+									</label>
+									<input
+										type="text"
+										name="name"
+										required
+										value={event.name}
+										onChange={handleChange}
+										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+										style={{ background: 'rgba(255,255,255,0.03)' }}
+									/>
+								</div>
 
-						{/* City */}
-						<div className="space-y-2">
-							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-								<MapPin size={14} className="text-primary" /> City
-							</label>
-							<input
-								type="text"
-								name="city"
-								value={event.city || ''}
-								onChange={handleChange}
-								className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-								style={{ background: 'rgba(255,255,255,0.03)' }}
-							/>
-						</div>
+								{/* Logo Section */}
+								<div className="flex flex-col md:flex-row gap-8 items-start pb-6 border-b border-white/5">
+									<div className="w-32 h-32 bg-white rounded-3xl flex items-center justify-center overflow-hidden border border-white/10 p-2 shrink-0">
+										{event.logo ? (
+											<img src={getImagePath(event.logo, 'events')} alt="Event logo" className="w-full h-full object-contain" />
+										) : (
+											<ImageIcon size={40} className="text-slate-400" />
+										)}
+									</div>
+									<div className="flex-1 space-y-2 w-full">
+										<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+											<ImageIcon size={14} className="text-primary" /> Event Logo
+										</label>
+										<div className="flex flex-col gap-2">
+											<input
+												type="file"
+												accept="image/*"
+												onChange={async (e) => {
+													const file = e.target.files?.[0];
+													if (!file) return;
 
-						{/* Country */}
-						<div className="space-y-2">
-							<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-								<MapPin size={14} className="text-primary" /> Country
-							</label>
-							<CountrySelect
-								value={event.country || ''}
-								onChange={v => setEvent({ ...event, country: v })}
-								className="w-full px-4 pt-3 pb-4 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-[#293143]"
-								style={{ background: 'rgba(255,255,255,0.03)' }}
-							/>
-						</div>
-					</div>
+													const resizeImageToBlob = (file: File, maxWidth = 500): Promise<Blob> =>
+														new Promise((resolve, reject) => {
+															const img = new window.Image();
+															const url = URL.createObjectURL(file);
+															img.onload = () => {
+																URL.revokeObjectURL(url);
+																const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+																const canvas = document.createElement('canvas');
+																canvas.width = Math.round(img.width * scale);
+																canvas.height = Math.round(img.height * scale);
+																canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+																canvas.toBlob(
+																	blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
+																	'image/jpeg',
+																	0.85
+																);
+															};
+															img.onerror = reject;
+															img.src = url;
+														});
 
-					{/* Email Template Section */}
+													try {
+														setUploading(true);
+														const resized = await resizeImageToBlob(file);
+														const formData = new FormData();
+														formData.append('file', resized, file.name.replace(/\.[^.]+$/, '.jpg'));
 
-					<div className="space-y-3">
-						<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-							<Mail size={14} className="text-primary" /> Email Template (HTML)
-						</label>
-						<textarea
-							ref={textareaRef}
-							name="email_template"
-							value={event.email_template || ''}
-							onChange={handleChange}
-							rows={8}
-							className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 font-mono text-sm"
-							style={{ background: 'rgba(255,255,255,0.03)' }}
-							placeholder="<h1>Hello {{guest_name}}!</h1>..."
-						></textarea>
+														const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload?folder=events`, formData, {
+															headers: {
+																'Content-Type': 'multipart/form-data',
+																Authorization: `Bearer ${token}`
+															}
+														});
+														setEvent({ ...event, logo: res.data.url });
+													} catch (err: unknown) {
+														alert('Error uploading image, ' + (err as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (err as { message?: string }).message);
+													} finally {
+														setUploading(false);
+													}
+												}}
+												className="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-primary file:text-white hover:file:opacity-90 file:cursor-pointer"
+											/>
+											{uploading && <p className="text-xs text-primary animate-pulse">Uploading...</p>}
+											<p className="text-xs text-slate-500 italic">Select an image to upload as the event logo (PNG, square image). Resized to 500px wide.</p>
+										</div>
+									</div>
+								</div>
 
-						<div className="flex flex-wrap gap-2">
-							{[
-								{ label: '+ Guest Name', placeholder: '{{guest_name}}' },
-								{ label: '+ Event Name', placeholder: '{{event_name}}' },
-								{ label: '+ Event Location', placeholder: '{{event_city}}, {{event_country}}' },
-								{ label: '+ Event Date', placeholder: '{{event_date}}' }
-							].map((item) => (
-								<button
-									key={item.label}
-									type="button"
-									onClick={() => insertPlaceholder(item.placeholder)}
-									className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-semibold transition-colors"
-								>
-									{item.label}
-								</button>
-							))}
-						</div>
-						<p className="text-xs text-slate-500">Click the buttons above to insert placeholders at the cursor position.</p>
-					</div>
+								{/* Date */}
+								<div className="space-y-2">
+									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+										<Calendar size={14} className="text-primary" /> Date
+									</label>
+									<input
+										type="date"
+										name="date"
+										value={event.date || ''}
+										onChange={handleChange}
+										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+										style={{ background: 'rgba(255,255,255,0.03)' }}
+									/>
+								</div>
+
+								{/* City */}
+								<div className="space-y-2">
+									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+										<MapPin size={14} className="text-primary" /> City
+									</label>
+									<input
+										type="text"
+										name="city"
+										value={event.city || ''}
+										onChange={handleChange}
+										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+										style={{ background: 'rgba(255,255,255,0.03)' }}
+									/>
+								</div>
+
+								{/* Country */}
+								<div className="space-y-2">
+									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+										<MapPin size={14} className="text-primary" /> Country
+									</label>
+									<CountrySelect
+										value={event.country || ''}
+										onChange={v => setEvent({ ...event, country: v })}
+										className="w-full px-4 pt-3 pb-4 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-[#293143]"
+										style={{ background: 'rgba(255,255,255,0.03)' }}
+									/>
+								</div>
+							</div>
+
+							{/* Email Template Section */}
+
+							<div className="space-y-3">
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+									<Mail size={14} className="text-primary" /> Email Template (HTML)
+								</label>
+								<textarea
+									ref={textareaRef}
+									name="email_template"
+									value={event.email_template || ''}
+									onChange={handleChange}
+									rows={8}
+									className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 font-mono text-sm"
+									style={{ background: 'rgba(255,255,255,0.03)' }}
+									placeholder="<h1>Hello {{guest_name}}!</h1>..."
+								></textarea>
+
+								<div className="flex flex-wrap gap-2">
+									{[
+										{ label: '+ Guest Name', placeholder: '{{guest_name}}' },
+										{ label: '+ Event Name', placeholder: '{{event_name}}' },
+										{ label: '+ Event Location', placeholder: '{{event_city}}, {{event_country}}' },
+										{ label: '+ Event Date', placeholder: '{{event_date}}' }
+									].map((item) => (
+										<button
+											key={item.label}
+											type="button"
+											onClick={() => insertPlaceholder(item.placeholder)}
+											className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:border-white/20 text-xs font-semibold transition-colors"
+										>
+											{item.label}
+										</button>
+									))}
+								</div>
+								<p className="text-xs text-slate-500">Click the buttons above to insert placeholders at the cursor position.</p>
+							</div>
 						</>
 					)}
 
@@ -386,8 +384,8 @@ const EventEdit = () => {
 									<Copy size={14} /> Copy from Template
 								</button>
 							</div>
-							<EventFieldsBuilder 
-								eventId={id || null} 
+							<EventFieldsBuilder
+								eventId={id || null}
 								onFieldsSaved={() => setFieldsRefresh(prev => prev + 1)}
 								refreshTrigger={fieldsRefresh}
 							/>

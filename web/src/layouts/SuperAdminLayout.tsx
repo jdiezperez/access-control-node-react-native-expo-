@@ -1,8 +1,7 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Building2, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
 
 export default function SuperAdminLayout() {
-    const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -10,9 +9,6 @@ export default function SuperAdminLayout() {
         localStorage.removeItem('user');
         navigate('/login');
     };
-
-    const isActive = (href: string) =>
-        location.pathname === href || location.pathname.startsWith(href + '/');
 
     return (
         <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>

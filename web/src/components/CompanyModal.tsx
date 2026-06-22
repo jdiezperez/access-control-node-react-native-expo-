@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    X, Building2, Mail, Phone, MapPin, Globe, User,
+    X, Building2, Mail, Phone, MapPin, User,
     Lock, Eye, EyeOff, Loader2, Save, ShieldCheck, Upload, Image
 } from 'lucide-react';
 import axios from 'axios';

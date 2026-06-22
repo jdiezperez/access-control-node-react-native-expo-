@@ -23,20 +23,21 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK(type IN ('admin', 'manager', 'user', 'guest', 'superadmin')) DEFAULT 'guest',
+    company_id INTEGER,
     name TEXT NOT NULL,
     surname TEXT NOT NULL,
-    role TEXT,
-    organization TEXT,
-    city TEXT,
-    country TEXT,
-    gender TEXT CHECK(gender IN ('female', 'male', 'non binary', 'other', 'prefer not to say')),
-    image TEXT,
     email TEXT UNIQUE NOT NULL,
     password TEXT,
+    role TEXT,
+    type TEXT NOT NULL CHECK(type IN ('admin', 'manager', 'user', 'superadmin')),
     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    company_id INTEGER,
     FOREIGN KEY(company_id) REFERENCES companies(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS guests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_one_admin_per_company ON users (company_id) WHERE type = 'admin';
@@ -79,7 +80,7 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS events_guests (
-    user_id INTEGER,
+    guest_id INTEGER,
     event_id INTEGER,
     invited BOOLEAN DEFAULT 0,
     invited_date DATETIME,
@@ -88,6 +89,15 @@ db.exec(`
     attended BOOLEAN DEFAULT 0,
     attended_date DATETIME,
     invitation_code TEXT UNIQUE,
+    creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(guest_id) REFERENCES guests(id) ON DELETE CASCADE,
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
+    PRIMARY KEY(guest_id, event_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS events_users (
+    user_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
     creation_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
@@ -115,7 +125,7 @@ db.exec(`
     field_value TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(guest_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(guest_id) REFERENCES guests(id) ON DELETE CASCADE,
     FOREIGN KEY(field_id) REFERENCES fields(id) ON DELETE CASCADE,
     UNIQUE(guest_id, field_id)
   );

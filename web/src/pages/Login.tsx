@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Mail, Lock, Loader2, Building2 } from 'lucide-react';
+import { ShieldAlert, Mail, Lock, Loader2 } from 'lucide-react';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -17,8 +17,8 @@ const Login = () => {
         try {
             const res = await axios.post('/api/auth/login', { email, password });
             const user = res.data.user;
-            if (user.type !== 'admin' && user.type !== 'manager' && user.type !== 'superadmin') {
-                setError('Access denied. Only admins and managers can access the dashboard.');
+            if (user.type !== 'admin' && user.type !== 'manager' && user.type !== 'superadmin' && user.type !== 'user') {
+                setError('Access denied. You do not have permission to access this portal.');
                 setLoading(false);
                 return;
             }
@@ -26,6 +26,8 @@ const Login = () => {
             localStorage.setItem('user', JSON.stringify(user));
             if (user.type === 'superadmin') {
                 navigate('/superadmin/companies');
+            } else if (user.type === 'user') {
+                navigate('/admin/scan');
             } else {
                 navigate('/admin');
             }
@@ -45,7 +47,7 @@ const Login = () => {
             <div className="w-full max-w-md">
                 <div className="text-center mb-10">
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-3xl text-primary mb-6 animate-in fade-in zoom-in duration-500">
-                        <img src='/logo_entrypoint.png' size={40} />
+                        <img src='/logo_entrypoint.png' className="w-10 h-10 object-contain" />
                     </div>
                     <h1 className="text-4xl font-black text-white tracking-tight mb-2">Admin Portal</h1>
                     <p className="text-slate-500 font-medium">Access your company management dashboard</p>

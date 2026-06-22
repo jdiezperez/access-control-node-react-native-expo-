@@ -173,7 +173,7 @@ const AddSponsorModal = ({ onClose, onAdded, eventId }: { onClose: () => void, o
                                 />
                             </div>
 
-                            <div className="border rounded-xl overflow-hidden">
+                            <div className="border rounded-xl overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50">
                                         <tr>

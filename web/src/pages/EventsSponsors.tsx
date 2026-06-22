@@ -124,76 +124,132 @@ const EventsSponsors = () => {
                         <p className="text-slate-400">No sponsors assigned to this event or matching your search.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-black/10 border-b border-white/5">
-                                <tr>
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Logo</th>
-                                    {['name', 'contact', 'contact_email', 'contact_phone', 'country'].map(field => (
-                                        <th
-                                            key={field}
-                                            onClick={() => handleSort(field as keyof Sponsor)}
-                                            className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                {field.replace('_', ' ')}
-                                                {sortField === field && (
-                                                    sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                                                )}
-                                            </div>
-                                        </th>
-                                    ))}
-                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {filteredSponsors.map(sponsor => (
-                                    <tr key={sponsor.id} className="hover:bg-white/5 transition-colors">
-                                        <td className="px-6 py-4">
-                                            {sponsor.logo ? (
-                                                <img src={sponsor.logo} alt={sponsor.name} className="w-10 h-10 object-contain rounded bg-white border border-white/10" />
-                                            ) : (
-                                                <div className="w-10 h-10 bg-slate-800 rounded flex items-center justify-center text-slate-400 border border-white/10">
-                                                    <Globe size={20} />
+                    <>
+                        {/* Desktop Table View */}
+                        <div className="hidden lg:block overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-black/10 border-b border-white/5">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Logo</th>
+                                        {['name', 'contact', 'contact_email', 'contact_phone', 'country'].map(field => (
+                                            <th
+                                                key={field}
+                                                onClick={() => handleSort(field as keyof Sponsor)}
+                                                className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    {field.replace('_', ' ')}
+                                                    {sortField === field && (
+                                                        sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                    )}
                                                 </div>
+                                            </th>
+                                        ))}
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {filteredSponsors.map(sponsor => (
+                                        <tr key={sponsor.id} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-6 py-4">
+                                                {sponsor.logo ? (
+                                                    <img src={sponsor.logo} alt={sponsor.name} className="w-10 h-10 object-contain rounded bg-white border border-white/10" />
+                                                ) : (
+                                                    <div className="w-10 h-10 bg-slate-800 rounded flex items-center justify-center text-slate-400 border border-white/10">
+                                                        <Globe size={20} />
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-white">{sponsor.name}</div>
+                                                {sponsor.url && (
+                                                    <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">
+                                                        <Globe size={10} /> {sponsor.url.substring(0, 20)}
+                                                    </a>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-300">{sponsor.contact || '-'}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-sm text-slate-300">
+                                                    <Mail size={14} className="text-slate-500" />
+                                                    {sponsor.contact_email || '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-sm text-slate-300">
+                                                    <Phone size={14} className="text-slate-500" />
+                                                    {sponsor.contact_phone || '-'}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-300">{sponsor.country || '-'}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <button
+                                                    onClick={() => handleRemoveSponsor(sponsor.id)}
+                                                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
+                                                    title="Remove from event"
+                                                >
+                                                    <Unlink size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile/Tablet Card View */}
+                        <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                            {filteredSponsors.map(sponsor => (
+                                <div key={sponsor.id} className="rounded-2xl border border-white/10 p-5 flex flex-col gap-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden border border-white/10 p-1 shrink-0">
+                                            {sponsor.logo ? (
+                                                <img src={sponsor.logo} alt={sponsor.name} className="w-full h-full object-contain" />
+                                            ) : (
+                                                <Globe size={20} className="text-slate-400" />
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-semibold text-white">{sponsor.name}</div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-white text-base truncate">{sponsor.name}</h3>
                                             {sponsor.url && (
-                                                <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">
-                                                    <Globe size={10} /> {sponsor.url.substring(0, 20)}
+                                                <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
+                                                    <Globe size={10} /> {sponsor.url.substring(0, 25)}
                                                 </a>
                                             )}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-300">{sponsor.contact || '-'}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                                <Mail size={14} className="text-slate-500" />
-                                                {sponsor.contact_email || '-'}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5 text-xs text-slate-400 border-t border-white/5 pt-3">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="font-semibold text-slate-300">{sponsor.contact || '-'}</span>
+                                        </div>
+                                        {sponsor.contact_email && (
+                                            <div className="flex items-center gap-1.5">
+                                                <Mail size={12} className="text-slate-500" /> {sponsor.contact_email}
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                                <Phone size={14} className="text-slate-500" />
-                                                {sponsor.contact_phone || '-'}
+                                        )}
+                                        {sponsor.contact_phone && (
+                                            <div className="flex items-center gap-1.5">
+                                                <Phone size={12} className="text-slate-500" /> {sponsor.contact_phone}
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-300">{sponsor.country || '-'}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <button
-                                                onClick={() => handleRemoveSponsor(sponsor.id)}
-                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all"
-                                                title="Remove from event"
-                                            >
-                                                <Unlink size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="font-semibold text-slate-500">Country:</span> <span className="text-slate-300">{sponsor.country || '-'}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 border-t border-white/5 pt-3">
+                                        <button
+                                            onClick={() => handleRemoveSponsor(sponsor.id)}
+                                            className="w-full flex items-center justify-center gap-2 py-2 border border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 rounded-xl text-xs font-semibold text-red-400 transition-all"
+                                        >
+                                            <Unlink size={14} /> Remove Sponsor
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
 

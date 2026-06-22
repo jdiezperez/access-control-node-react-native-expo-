@@ -1,5 +1,5 @@
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
-import { Menu as Bars3Icon, X as XMarkIcon, Building2, CalendarDays, Users, LogOut, Scan, ChevronDown } from 'lucide-react'
+import { Menu as Bars3Icon, X as XMarkIcon, Building2, CalendarDays, Users, LogOut, ChevronDown, Scan } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -23,6 +23,7 @@ export default function NavBar() {
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isManager, setIsManager] = useState(false);
+    const [isUser, setIsUser] = useState(false);
     const [userName, setUserName] = useState('My Profile');
     const [userObj, setUserObj] = useState<any>(null);
     const [companyInfo, setCompanyInfo] = useState<any>(null);
@@ -38,6 +39,7 @@ export default function NavBar() {
             setIsSuperAdmin(user.type === 'superadmin');
             setIsAdmin(user.type === 'admin');
             setIsManager(user.type === 'manager');
+            setIsUser(user.type === 'user');
             setUserName(`${user.name || ''} ${user.surname || ''}`.trim() || 'My Profile');
 
             // Superadmin has no company_id — skip logo/company fetch
@@ -140,12 +142,11 @@ export default function NavBar() {
                             </div>
                             <div className="hidden sm:ml-6 sm:block">
                                 <div className="flex space-x-4">
-                                    {(isAdmin || isManager) ? navigation.map((item) => {
+                                    {(isAdmin || isManager) && navigation.map((item) => {
                                         const isActive = location.pathname === item.href || (item.href !== '/admin' && location.pathname.startsWith(item.href));
                                         return (
-                                            <div className="flex items-center gap-1">
+                                            <div key={item.name} className="flex items-center gap-1">
                                                 <Link
-                                                    key={item.name}
                                                     to={item.href}
                                                     className={classNames(
                                                         isActive ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white',
@@ -157,7 +158,22 @@ export default function NavBar() {
                                                 </Link>
                                             </div>
                                         );
-                                    }) : null}
+                                    })}
+
+                                    {(isAdmin || isManager || isUser) && (
+                                        <div className="flex items-center gap-1">
+                                            <Link
+                                                to="/admin/scan"
+                                                className={classNames(
+                                                    location.pathname === '/admin/scan' ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white',
+                                                    'rounded-md px-3 py-2 text-sm font-medium transition-all flex items-center gap-2 rounded-xl text-sm font-semibold',
+                                                )}
+                                            >
+                                                <Scan size={16} />
+                                                Scan Access
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -176,11 +192,10 @@ export default function NavBar() {
                                     <span className="absolute -inset-1.5" />
                                     <span className="sr-only">Open company menu</span>
                                     <div className='flex gap-2 items-center'>
-                                        <div className={classNames('flex items-center gap-1 rounded-md px-3 py-2 text-sm font- medium text-gray-300 hover:text-white')}>
-                                            <div>{userName}</div>
-                                            <ChevronDown size={14} />
+                                        <div className={classNames('flex items-center gap-1 rounded-md px-2 sm:px-3 py-2 text-sm font-medium text-gray-300 hover:text-white')}>
+                                            <div className="max-w-[100px] sm:max-w-[160px] truncate">{userName}</div>
+                                            <ChevronDown size={14} className="flex-shrink-0" />
                                         </div>
-
                                     </div>
                                 </MenuButton>
                                 <MenuItems
@@ -235,9 +250,9 @@ export default function NavBar() {
                     </div>
                 </div>
 
-                <DisclosurePanel className="sm:hidden">
+                <DisclosurePanel className="sm:hidden border-t border-white/10">
                     <div className="space-y-1 px-2 pt-2 pb-3">
-                        {navigation.map((item) => {
+                        {(isAdmin || isManager) && navigation.map((item) => {
                             const isActive = location.pathname === item.href || (item.href !== '/admin' && location.pathname.startsWith(item.href));
                             return (
                                 <DisclosureButton
@@ -246,14 +261,41 @@ export default function NavBar() {
                                     to={item.href}
                                     aria-current={isActive ? 'page' : undefined}
                                     className={classNames(
-                                        isActive ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white',
-                                        'block rounded-md px-3 py-2 text-base font-medium',
+                                        isActive ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white',
+                                        'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium',
                                     )}
                                 >
-                                    {item.name}
+                                    {item.icon}{item.name}
                                 </DisclosureButton>
                             );
                         })}
+
+                        {(isAdmin || isManager || isUser) && (
+                            <DisclosureButton
+                                as={Link}
+                                to="/admin/scan"
+                                aria-current={location.pathname === '/admin/scan' ? 'page' : undefined}
+                                className={classNames(
+                                    location.pathname === '/admin/scan' ? 'bg-white/10 text-white font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white',
+                                    'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium',
+                                )}
+                            >
+                                <Scan size={16} />Scan Access
+                            </DisclosureButton>
+                        )}
+
+                        {isAdmin && (
+                            <DisclosureButton as={Link} to="/admin/users"
+                                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+                                <Users size={16} /> Users
+                            </DisclosureButton>
+                        )}
+                        {isManager && (
+                            <DisclosureButton as={Link} to="/admin/users"
+                                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">
+                                <Users size={16} /> Users
+                            </DisclosureButton>
+                        )}
                     </div>
                 </DisclosurePanel>
             </Disclosure>

@@ -220,6 +220,7 @@ app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (re
 		if (eventIds.length > 0) {
 			const placeholders = eventIds.map(() => '?').join(',');
 			db.prepare(`DELETE FROM events_guests WHERE event_id IN (${placeholders})`).run(...eventIds);
+			db.prepare(`DELETE FROM events_users WHERE event_id IN (${placeholders})`).run(...eventIds);
 			db.prepare(`DELETE FROM events_sponsors WHERE event_id IN (${placeholders})`).run(...eventIds);
 		}
 
@@ -318,7 +319,7 @@ app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
 	if (type) {
 		users = db.prepare('SELECT * FROM users WHERE type = ? AND company_id = ?').all(type, req.user.company_id);
 	} else {
-		users = db.prepare('SELECT * FROM users WHERE company_id = ?').all(req.user.company_id);
+		users = db.prepare("SELECT * FROM users WHERE company_id = ? AND type != 'admin'").all(req.user.company_id);
 	}
 	res.json(users);
 });
@@ -335,6 +336,10 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 	if (type === 'admin') {
 		return res.status(403).json({ message: 'Admin users cannot be created by Managers or Admins' });
 	}
+
+    if (req.user.type === 'manager' && type === 'manager') {
+        return res.status(403).json({ message: 'Managers cannot create other managers' });
+    }
 
 	const hashedPassword = password ? bcrypt.hashSync(password, 10) : null;
 	try {
@@ -354,7 +359,7 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 });
 
 // PUT Update User (Managers & Guests)
-app.put('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
+app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const { name, surname, email, type, city, country, organization, role, gender, image } = req.body;
 
 	// Validation: manager cannot promote/demote admin & user must be in same company
@@ -363,11 +368,14 @@ app.put('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 		return res.status(404).json({ message: 'User not found' });
 	}
 
-	/**** DELETE
-	if (req.user.type === 'manager' && (type === 'admin' || userToEdit.type === 'admin')) {
-		return res.status(403).json({ message: 'Managers cannot modify or assign admin privileges' });
-	}
-	*/
+    if (req.user.type === 'manager') {
+        if (parseInt(req.params.id) !== req.user.id && userToEdit.type !== 'user') {
+            return res.status(403).json({ message: 'Managers can only edit users of type "user"' });
+        }
+        if (type && type !== userToEdit.type) {
+            return res.status(403).json({ message: 'Managers cannot change user roles' });
+        }
+    }
 
 	if (req.user.type === 'admin' && (type === 'superadmin' || userToEdit.type === 'superadmin')) {
 		return res.status(403).json({ message: 'Admins cannot modify or assign superadmin privileges' });
@@ -392,15 +400,13 @@ app.put('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 	}
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const userToDelete = db.prepare('SELECT type, company_id FROM users WHERE id = ?').get(req.params.id);
 	if (!userToDelete || userToDelete.company_id !== req.user.company_id) return res.status(404).json({ message: 'User not found' });
 
-	/**** DELETE 
-	if (req.user.type === 'manager' && userToDelete.type === 'admin') {
-		return res.status(403).json({ message: 'Managers cannot delete admins' });
-	}
-	*/
+    if (req.user.type === 'manager' && userToDelete.type !== 'user') {
+        return res.status(403).json({ message: 'Managers can only delete users of type "user"' });
+    }
 
 	if (userToDelete.type === 'superadmin') {
 		return res.status(403).json({ message: 'Superadmin cannot be deleted' });
@@ -414,36 +420,59 @@ app.delete('/api/admin/users/:id', authenticateToken, isAdmin, (req, res) => {
 	}
 });
 
-// User-Event Assignment Routes (for admin/user type users)
+// User-Event Assignment Routes (staff: managers & users)
 app.get('/api/admin/users/:id/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const targetUser = db.prepare('SELECT company_id FROM users WHERE id = ?').get(req.params.id);
+	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(req.params.id);
 	if (!targetUser || targetUser.company_id !== req.user.company_id) {
 		return res.status(404).json({ message: 'User not found' });
 	}
-	const events = db.prepare(`
-		SELECT e.*, 
-			CASE WHEN eg.user_id IS NOT NULL THEN 1 ELSE 0 END as assigned
-		FROM events e
-		LEFT JOIN events_guests eg ON e.id = eg.event_id AND eg.user_id = ?
-		WHERE e.status IN ('not active', 'active') AND e.company_id = ?
-		ORDER BY e.date DESC
-	`).all(req.params.id, req.user.company_id);
+	if (req.user.type === 'manager' && targetUser.type !== 'user' && parseInt(req.params.id) !== req.user.id) {
+		return res.status(403).json({ message: 'Managers can only view events for themselves or "user" type accounts' });
+	}
+	let events;
+	if (req.user.type === 'manager' && parseInt(req.params.id) !== req.user.id) {
+		// Manager viewing another user's events: only show events the manager is also assigned to
+		events = db.prepare(`
+			SELECT e.*,
+				CASE WHEN eu_target.user_id IS NOT NULL THEN 1 ELSE 0 END as assigned
+			FROM events e
+			JOIN events_users eu_manager ON e.id = eu_manager.event_id AND eu_manager.user_id = ?
+			LEFT JOIN events_users eu_target ON e.id = eu_target.event_id AND eu_target.user_id = ?
+			WHERE e.status IN ('not active', 'active') AND e.company_id = ?
+			ORDER BY e.date DESC
+		`).all(req.user.id, parseInt(req.params.id), req.user.company_id);
+	} else {
+		// Admin or manager viewing their own events: show all company events
+		events = db.prepare(`
+			SELECT e.*,
+				CASE WHEN eu.user_id IS NOT NULL THEN 1 ELSE 0 END as assigned
+			FROM events e
+			LEFT JOIN events_users eu ON e.id = eu.event_id AND eu.user_id = ?
+			WHERE e.status IN ('not active', 'active') AND e.company_id = ?
+			ORDER BY e.date DESC
+		`).all(parseInt(req.params.id), req.user.company_id);
+	}
 	res.json(events);
 });
 
 app.post('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const { id, eventId } = req.params;
-	const targetUser = db.prepare('SELECT company_id FROM users WHERE id = ?').get(id);
+	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(id);
 	const targetEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
 	if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
 		return res.status(403).json({ message: 'Unauthorized access' });
 	}
+	if (req.user.type === 'manager') {
+		if (targetUser.type !== 'user') {
+			return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
+		}
+		const managerAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
+		if (!managerAssigned) {
+			return res.status(403).json({ message: 'Managers can only assign users to events they themselves belong to' });
+		}
+	}
 	try {
-		const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-		db.prepare(`
-			INSERT OR IGNORE INTO events_guests (user_id, event_id, invitation_code)
-			VALUES (?, ?, ?)
-		`).run(id, eventId, invitationCode);
+		db.prepare('INSERT OR IGNORE INTO events_users (user_id, event_id) VALUES (?, ?)').run(id, eventId);
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Error assigning event: ' + err.message });
@@ -452,13 +481,22 @@ app.post('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrA
 
 app.delete('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const { id, eventId } = req.params;
-	const targetUser = db.prepare('SELECT company_id FROM users WHERE id = ?').get(id);
+	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(id);
 	const targetEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
 	if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
 		return res.status(403).json({ message: 'Unauthorized access' });
 	}
+	if (req.user.type === 'manager') {
+		if (targetUser.type !== 'user') {
+			return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
+		}
+		const managerAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
+		if (!managerAssigned) {
+			return res.status(403).json({ message: 'Managers can only unassign users from events they themselves belong to' });
+		}
+	}
 	try {
-		db.prepare('DELETE FROM events_guests WHERE user_id = ? AND event_id = ?').run(id, eventId);
+		db.prepare('DELETE FROM events_users WHERE user_id = ? AND event_id = ?').run(id, eventId);
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Error unassigning event: ' + err.message });
@@ -466,33 +504,113 @@ app.delete('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerO
 });
 
 app.post('/api/admin/guests/:id/send', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const guest = db.prepare('SELECT company_id FROM users WHERE id = ? AND type = ?').get(req.params.id, 'guest');
-	if (!guest || guest.company_id !== req.user.company_id) return res.status(404).json({ message: 'Guest not found' });
+	const guest = db.prepare('SELECT g.id FROM guests g JOIN events_guests eg ON g.id = eg.guest_id JOIN events e ON eg.event_id = e.id WHERE g.id = ? AND e.company_id = ?').get(req.params.id, req.user.company_id);
+	if (!guest) return res.status(404).json({ message: 'Guest not found' });
 	res.json({ success: true, message: 'Invitation email sent' });
 });
 
 app.get('/api/admin/guests', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const guests = db.prepare(`
-		SELECT u.*, COUNT(eg.event_id) as event_count
-		FROM users u
-		LEFT JOIN events_guests eg ON u.id = eg.user_id
-		WHERE u.type = 'guest' AND u.company_id = ?
-		GROUP BY u.id
+		SELECT g.id, g.email, g.creation_date, COUNT(eg.event_id) as event_count
+		FROM guests g
+		JOIN events_guests eg ON g.id = eg.guest_id
+		JOIN events e ON eg.event_id = e.id
+		WHERE e.company_id = ?
+		GROUP BY g.id
 	`).all(req.user.company_id);
-	res.json(guests);
+    
+    const enrichedGuests = guests.map(g => {
+        const guestDataRows = db.prepare(`
+            SELECT f.field_name, gd.field_value 
+            FROM guestdata gd 
+            JOIN fields f ON gd.field_id = f.id 
+            WHERE gd.guest_id = ?
+        `).all(g.id);
+        let guestObj = { ...g, name: '', surname: '', organization: '', role: '', city: '', country: '', gender: '' };
+        guestDataRows.forEach(row => {
+            guestObj[row.field_name] = row.field_value;
+        });
+        return guestObj;
+    });
+
+	res.json(enrichedGuests);
 });
 
 app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const guest = db.prepare('SELECT company_id FROM users WHERE id = ? AND type = ?').get(req.params.id, 'guest');
-	if (!guest || guest.company_id !== req.user.company_id) return res.status(404).json({ message: 'Guest not found' });
-
 	const events = db.prepare(`
 		SELECT e.name, e.date, eg.invited, eg.accepted, eg.attended
 		FROM events e
 		JOIN events_guests eg ON e.id = eg.event_id
-		WHERE eg.user_id = ? AND e.company_id = ?
+		WHERE eg.guest_id = ? AND e.company_id = ?
 	`).all(req.params.id, req.user.company_id);
 	res.json(events);
+});
+
+app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManagerOrAdmin, (req, res) => {
+    const { eventId } = req.params;
+    const { guestData } = req.body; 
+    
+    const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
+    if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+
+    try {
+        db.transaction(() => {
+            let guestInfo = db.prepare('SELECT id FROM guests WHERE email = ?').get(guestData.email);
+            let guestId;
+            if (guestInfo) {
+                guestId = guestInfo.id;
+            } else {
+                const insertGuest = db.prepare('INSERT INTO guests (email) VALUES (?)').run(guestData.email);
+                guestId = insertGuest.lastInsertRowid;
+            }
+
+            const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            db.prepare(`
+                INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
+                VALUES (?, ?, ?)
+            `).run(guestId, eventId, invitationCode);
+
+            const fields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?').all(eventId);
+            const insertData = db.prepare(`
+                INSERT OR REPLACE INTO guestdata (guest_id, field_id, field_value)
+                VALUES (?, ?, ?)
+            `);
+
+            fields.forEach(field => {
+                if (guestData[field.field_name] !== undefined) {
+                    insertData.run(guestId, field.id, guestData[field.field_name]);
+                }
+            });
+        })();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error creating guest:', err);
+        res.status(400).json({ message: 'Error creating guest: ' + err.message });
+    }
+});
+
+app.post('/api/admin/events/:eventId/guests', authenticateToken, isManagerOrAdmin, (req, res) => {
+    const { eventId } = req.params;
+    const { guestIds } = req.body;
+    
+    const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
+    if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+
+    try {
+        db.transaction(() => {
+            const stmt = db.prepare(`
+                INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
+                VALUES (?, ?, ?)
+            `);
+            guestIds.forEach(guestId => {
+                const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                stmt.run(guestId, eventId, invitationCode);
+            });
+        })();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(400).json({ message: 'Error assigning guests: ' + err.message });
+    }
 });
 
 // Admin Routes - Events
@@ -582,18 +700,31 @@ const buildBadgeEmailHtml = (guest, event) => {
 	`;
 };
 
-// Invite a single guest
-app.post('/api/admin/events/:id/guests/:userId/invite', authenticateToken, isManagerOrAdmin, async (req, res) => {
+app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const event = db.prepare('SELECT * FROM events WHERE id = ? AND company_id = ?').get(req.params.id, req.user.company_id);
 	if (!event) return res.status(404).json({ message: 'Event not found' });
 	if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
 
-	const guest = db.prepare('SELECT * FROM users WHERE id = ? AND company_id = ?').get(req.params.userId, req.user.company_id);
-	if (!guest) return res.status(404).json({ message: 'Guest not found' });
+	const guestInfo = db.prepare(`
+		SELECT g.id, g.email, eg.invitation_code 
+		FROM guests g 
+		JOIN events_guests eg ON g.id = eg.guest_id 
+		WHERE g.id = ? AND eg.event_id = ?
+	`).get(req.params.guestId, req.params.id);
+	
+	if (!guestInfo) return res.status(404).json({ message: 'Guest not found' });
+
+    const guestDataRows = db.prepare(`
+        SELECT f.field_name, gd.field_value 
+        FROM guestdata gd JOIN fields f ON gd.field_id = f.id 
+        WHERE gd.guest_id = ? AND f.event_id = ?
+    `).all(req.params.guestId, req.params.id);
+    
+    let guest = { id: guestInfo.id, email: guestInfo.email, invitation_code: guestInfo.invitation_code, name: '', surname: '', city: '', country: '', role: '', organization: '' };
+    guestDataRows.forEach(row => guest[row.field_name] = row.field_value);
 
 	try {
-		const guestWithCode = db.prepare('SELECT invitation_code FROM events_guests WHERE event_id = ? AND user_id = ?').get(req.params.id, req.params.userId);
-		const html = buildEmailHtml(event.email_template, guest, event, guestWithCode?.invitation_code);
+		const html = buildEmailHtml(event.email_template, guest, event, guest.invitation_code);
 		const response = await axios.post(SENDPIGEON_API, {
 			from: EMAIL_FROM,
 			to: guest.email,
@@ -605,8 +736,8 @@ app.post('/api/admin/events/:id/guests/:userId/invite', authenticateToken, isMan
 			return res.status(500).json({ message: 'Email delivery failed' });
 		}
 
-		db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND user_id = ?')
-			.run(req.params.id, req.params.userId);
+		db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND guest_id = ?')
+			.run(req.params.id, req.params.guestId);
 		res.json({ success: true });
 	} catch (err) {
 		const msg = err.response?.data?.message || err.message;
@@ -620,13 +751,26 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 	if (!event) return res.status(404).json({ message: 'Event not found' });
 	if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
 
-	const guests = db.prepare(`
-		SELECT u.* FROM users u
-		JOIN events_guests eg ON u.id = eg.user_id
-		WHERE eg.event_id = ? AND u.company_id = ?
-	`).all(req.params.id, req.user.company_id);
+	const baseGuests = db.prepare(`
+		SELECT g.id, g.email, eg.invitation_code 
+		FROM guests g
+		JOIN events_guests eg ON g.id = eg.guest_id
+		WHERE eg.event_id = ?
+	`).all(req.params.id);
 
-	if (guests.length === 0) return res.json({ success: true, sent: 0, errors: [] });
+	if (baseGuests.length === 0) return res.json({ success: true, sent: 0, errors: [] });
+
+    const guests = baseGuests.map(g => {
+        const guestDataRows = db.prepare(`
+            SELECT f.field_name, gd.field_value 
+            FROM guestdata gd JOIN fields f ON gd.field_id = f.id 
+            WHERE gd.guest_id = ? AND f.event_id = ?
+        `).all(g.id, req.params.id);
+        
+        let guestObj = { ...g, name: '', surname: '', city: '', country: '', role: '', organization: '' };
+        guestDataRows.forEach(row => guestObj[row.field_name] = row.field_value);
+        return guestObj;
+    });
 
 	// Build batch payload (chunks of 100)
 	const emails = guests.map(guest => ({
@@ -644,7 +788,7 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 			.map(r => ({ guest: guests[r.index]?.email, error: 'Delivery failed' }));
 
 		// Mark successfully sent guests as invited
-		const updateStmt = db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND user_id = ?');
+		const updateStmt = db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND guest_id = ?');
 		results
 			.filter(r => r.status !== 'failed')
 			.forEach(r => { if (guests[r.index]) updateStmt.run(req.params.id, guests[r.index].id); });
@@ -658,11 +802,30 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 
 app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const { name, city, country, date, email_template, status, logo } = req.body;
-	const info = db.prepare(`
-		INSERT INTO events (name, city, country, date, email_template, status, logo, company_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`).run(name, city, country, date, email_template, status || 'not active', logo, req.user.company_id);
-	res.json({ id: info.lastInsertRowid });
+	try {
+		const info = db.transaction(() => {
+			const result = db.prepare(`
+				INSERT INTO events (name, city, country, date, email_template, status, logo, company_id)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`).run(name, city, country, date, email_template, status || 'not active', logo, req.user.company_id);
+			
+			const eventId = result.lastInsertRowid;
+			
+			const insertField = db.prepare(`
+				INSERT INTO fields (event_id, field_name, field_type, field_order, required)
+				VALUES (?, ?, ?, ?, ?)
+			`);
+			insertField.run(eventId, 'name', 'text', 0, 1);
+			insertField.run(eventId, 'surname', 'text', 1, 1);
+			insertField.run(eventId, 'email', 'text', 2, 1);
+			
+			return eventId;
+		})();
+		res.json({ id: info });
+	} catch (err) {
+		console.error("Error creating event:", err);
+		res.status(500).json({ message: 'Error creating event' });
+	}
 });
 
 app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
@@ -959,74 +1122,37 @@ app.delete('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, (req,
 	}
 });
 
-// Event Guests Management
+// Event Guests Management (registrant guests via guests + events_guests)
 app.get('/api/admin/events/:id/guests', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
 	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
 
-	const guests = db.prepare(`
-		SELECT u.*, eg.invited, eg.invited_date, eg.accepted, eg.accepted_date, eg.attended, eg.attended_date, eg.invitation_code
-		FROM users u
-		JOIN events_guests eg ON u.id = eg.user_id
-		WHERE eg.event_id = ? AND u.company_id = ?
-	`).all(req.params.id, req.user.company_id);
-	res.json(guests);
-});
+	const baseGuests = db.prepare(`
+		SELECT g.id, g.email, g.creation_date,
+			eg.invited, eg.invited_date, eg.accepted, eg.accepted_date,
+			eg.attended, eg.attended_date, eg.invitation_code
+		FROM guests g
+		JOIN events_guests eg ON g.id = eg.guest_id
+		WHERE eg.event_id = ?
+	`).all(req.params.id);
 
-app.get('/api/admin/events/:id/available-guests', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-
-	const guests = db.prepare(`
-		SELECT * FROM users 
-		WHERE type = 'guest' AND company_id = ?
-		AND id NOT IN (SELECT user_id FROM events_guests WHERE event_id = ?)
-	`).all(req.user.company_id, req.params.id);
-	res.json(guests);
-});
-
-app.post('/api/admin/events/:id/guests', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const { userIds } = req.body;
-	const eventId = req.params.id;
-
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-
-	// Validate target users belong to same company
-	const stmtCheck = db.prepare('SELECT company_id FROM users WHERE id = ?');
-	for (const userId of userIds) {
-		const targetUser = stmtCheck.get(userId);
-		if (!targetUser || targetUser.company_id !== req.user.company_id) {
-			return res.status(403).json({ message: 'Unauthorized guest addition' });
-		}
-	}
-
-	const insert = db.prepare(`
-		INSERT INTO events_guests (user_id, event_id, invitation_code)
-		VALUES (?, ?, ?)
-	`);
-
-	const transaction = db.transaction((ids) => {
-		for (const userId of ids) {
-			const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-			insert.run(userId, eventId, invitationCode);
-		}
+	const guests = baseGuests.map(g => {
+		const rows = db.prepare(`
+			SELECT f.field_name, gd.field_value
+			FROM guestdata gd JOIN fields f ON gd.field_id = f.id
+			WHERE gd.guest_id = ? AND f.event_id = ?
+		`).all(g.id, req.params.id);
+		const obj = { ...g, name: '', surname: '', role: '', organization: '', city: '', country: '', gender: '' };
+		rows.forEach(r => { obj[r.field_name] = r.field_value; });
+		return obj;
 	});
-
-	try {
-		transaction(userIds);
-		res.json({ success: true });
-	} catch (err) {
-		res.status(400).json({ message: 'Error adding guests' });
-	}
+	res.json(guests);
 });
 
-app.delete('/api/admin/events/:id/guests/:userId', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.delete('/api/admin/events/:id/guests/:guestId', authenticateToken, isManagerOrAdmin, (req, res) => {
 	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
 	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-
-	db.prepare('DELETE FROM events_guests WHERE event_id = ? AND user_id = ?')
-		.run(req.params.id, req.params.userId);
+	db.prepare('DELETE FROM events_guests WHERE event_id = ? AND guest_id = ?').run(req.params.id, req.params.guestId);
 	res.json({ success: true });
 });
 
@@ -1128,46 +1254,51 @@ app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAd
 		return res.status(404).json({ message: 'Event not found' });
 	}
 
-	const findUser = db.prepare('SELECT id FROM users WHERE email = ?');
-	const createUser = db.prepare(`
-		INSERT INTO users (name, surname, email, role, organization, city, country, gender, type, company_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	const findGuest = db.prepare('SELECT id FROM guests WHERE email = ?');
+	const createGuest = db.prepare('INSERT INTO guests (email) VALUES (?)');
+	const getFields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?');
+	const upsertData = db.prepare(`
+		INSERT INTO guestdata (guest_id, field_id, field_value)
+		VALUES (?, ?, ?)
+		ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
 	`);
 	const assignToEvent = db.prepare(`
-		INSERT OR IGNORE INTO events_guests (user_id, event_id, invitation_code)
+		INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
 		VALUES (?, ?, ?)
 	`);
+
+	const eventFields = getFields.all(eventId);
 
 	const transaction = db.transaction(() => {
 		for (let i = 1; i < lines.length; i++) {
 			if (!lines[i].trim()) continue;
 
 			const values = lines[i].split(',').map(v => v.trim());
-			const guest = {};
-			header.forEach((h, index) => guest[h] = values[index]);
+			const row = {};
+			header.forEach((h, index) => row[h] = values[index]);
 
-			if (!guest.name || !guest.surname || !guest.email) {
-				errors.push(`Line ${i + 1}: Missing name, surname or email`);
+			if (!row.email) {
+				errors.push(`Line ${i + 1}: Missing email`);
 				continue;
 			}
 
-			let userId;
-			const existing = findUser.get(guest.email);
+			let guestId;
+			const existing = findGuest.get(row.email);
 			if (existing) {
-				userId = existing.id;
+				guestId = existing.id;
 			} else {
-				const info = createUser.run(
-					guest.name, guest.surname, guest.email,
-					guest.role || null, guest.organization || null,
-					guest.city || null, guest.country || null,
-					(guest.gender && guest.gender.toLowerCase()) || null,
-					guest.type || 'guest',
-					req.user.company_id
-				);
-				userId = info.lastInsertRowid;
+				const info = createGuest.run(row.email);
+				guestId = info.lastInsertRowid;
 			}
+
 			const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-			assignToEvent.run(userId, eventId, invitationCode);
+			assignToEvent.run(guestId, eventId, invitationCode);
+
+			// Insert field data (name, surname, email and any extras)
+			eventFields.forEach(field => {
+				const val = row[field.field_name];
+				if (val !== undefined) upsertData.run(guestId, field.id, val);
+			});
 		}
 	});
 
@@ -1183,25 +1314,34 @@ app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAd
 
 // Public Routes - Guest Confirmation
 app.get('/api/public/confirmation/:code', (req, res) => {
-	const data = db.prepare(`
-		SELECT u.*, e.name as event_name, e.city, e.country, e.date, eg.accepted, eg.invitation_code
-		FROM users u
-		JOIN events_guests eg ON u.id = eg.user_id
+	const row = db.prepare(`
+		SELECT g.id as guest_id, g.email, e.id as event_id, e.name as event_name, e.city, e.country, e.date, eg.accepted, eg.invitation_code
+		FROM guests g
+		JOIN events_guests eg ON g.id = eg.guest_id
 		JOIN events e ON eg.event_id = e.id
 		WHERE eg.invitation_code = ?
 	`).get(req.params.code);
 
-	if (!data) return res.status(404).json({ message: 'Invalid invitation code' });
-	if (data.accepted) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
+	if (!row) return res.status(404).json({ message: 'Invalid invitation code' });
+	if (row.accepted) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
+
+	// Enrich with field data
+	const fieldRows = db.prepare(`
+		SELECT f.field_name, gd.field_value
+		FROM guestdata gd JOIN fields f ON gd.field_id = f.id
+		WHERE gd.guest_id = ? AND f.event_id = ?
+	`).all(row.guest_id, row.event_id);
+	const data = { ...row, name: '', surname: '', role: '', organization: '', city: '', country: '', gender: '' };
+	fieldRows.forEach(r => { data[r.field_name] = r.field_value; });
 	res.json(data);
 });
 
 app.post('/api/public/confirm', async (req, res) => {
 	const { code, userData } = req.body;
 	const invitation = db.prepare(`
-		SELECT eg.user_id, eg.event_id, eg.accepted, u.email, u.name, u.surname, eg.invitation_code
+		SELECT eg.guest_id, eg.event_id, eg.accepted, g.email, eg.invitation_code
 		FROM events_guests eg
-		JOIN users u ON eg.user_id = u.id
+		JOIN guests g ON eg.guest_id = g.id
 		WHERE eg.invitation_code = ?
 	`).get(code);
 
@@ -1210,23 +1350,19 @@ app.post('/api/public/confirm', async (req, res) => {
 
 	const event = db.prepare('SELECT * FROM events WHERE id = ?').get(invitation.event_id);
 
-	// Update user data
-	db.prepare(`
-		UPDATE users SET 
-		name = ?, surname = ?, city = ?, country = ?, organization = ?, role = ?, gender = ?, image = ?
-		WHERE id = ?
-	`).run(
-		userData.name, userData.surname, userData.city, userData.country,
-		userData.organization, userData.role, userData.gender, userData.image,
-		invitation.user_id
-	);
+	// Upsert field data (name, surname, etc.) into guestdata
+	const fields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?').all(invitation.event_id);
+	const upsert = db.prepare(`
+		INSERT INTO guestdata (guest_id, field_id, field_value)
+		VALUES (?, ?, ?)
+		ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
+	`);
+	fields.forEach(f => {
+		if (userData[f.field_name] !== undefined) upsert.run(invitation.guest_id, f.id, userData[f.field_name]);
+	});
 
 	// Mark as accepted
-	db.prepare(`
-		UPDATE events_guests 
-		SET accepted = 1, accepted_date = CURRENT_TIMESTAMP 
-		WHERE invitation_code = ?
-	`).run(code);
+	db.prepare('UPDATE events_guests SET accepted = 1, accepted_date = CURRENT_TIMESTAMP WHERE invitation_code = ?').run(code);
 
 	// Send Badge Email
 	try {
@@ -1245,24 +1381,26 @@ app.post('/api/public/confirm', async (req, res) => {
 	res.json({ success: true });
 });
 
-// Mobile App Routes - For Staff (Admins and Users)
+// Mobile App Routes - For Staff (Admins, Managers and Users)
 app.get('/api/mobile/events', authenticateToken, isStaff, (req, res) => {
-	const events = db.prepare(`
-		SELECT e.* FROM events e
-		JOIN events_guests eg ON e.id = eg.event_id
-		WHERE e.status = 'active' AND eg.user_id = ?
-	`).all(req.user.id);
-	res.json(events);
+	if (req.user.type === 'admin') {
+		const events = db.prepare(`
+			SELECT * FROM events 
+			WHERE status = 'active' AND company_id = ?
+		`).all(req.user.company_id);
+		return res.json(events);
+	} else {
+		const events = db.prepare(`
+			SELECT e.* FROM events e
+			JOIN events_users eu ON e.id = eu.event_id
+			WHERE e.status = 'active' AND eu.user_id = ?
+		`).all(req.user.id);
+		return res.json(events);
+	}
 });
 
 app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
 	const { invitationCode, eventId } = req.body;
-
-	// Verify if the scanning user is actually assigned to this event
-	const isAssigned = db.prepare(`
-		SELECT 1 FROM events_guests 
-		WHERE user_id = ? AND event_id = ?
-	`).get(req.user.id, eventId);
 
 	// Verify the event belongs to the same company
 	const eventCheck = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
@@ -1270,30 +1408,34 @@ app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
 		return res.status(403).json({ message: 'You are not authorized to scan for this event' });
 	}
 
-	if (!isAssigned && req.user.type !== 'admin' && req.user.type !== 'manager') {
-		return res.status(403).json({ message: 'You are not assigned to this event' });
+	// Verify if the scanning staff member is assigned to this event (admins bypass)
+	if (req.user.type !== 'admin') {
+		const isAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
+		if (!isAssigned) {
+			return res.status(403).json({ message: 'You are not assigned to this event' });
+		}
 	}
 
+	// Look up the guest by invitation code in events_guests
 	const guestInfo = db.prepare(`
-		SELECT u.name, u.surname, e.name as event_name
+		SELECT gd_name.field_value as name, gd_surname.field_value as surname, e.name as event_name
 		FROM events_guests eg
-		JOIN users u ON eg.user_id = u.id
 		JOIN events e ON eg.event_id = e.id
+		LEFT JOIN fields f_name ON f_name.event_id = e.id AND f_name.field_name = 'name'
+		LEFT JOIN guestdata gd_name ON gd_name.guest_id = eg.guest_id AND gd_name.field_id = f_name.id
+		LEFT JOIN fields f_surname ON f_surname.event_id = e.id AND f_surname.field_name = 'surname'
+		LEFT JOIN guestdata gd_surname ON gd_surname.guest_id = eg.guest_id AND gd_surname.field_id = f_surname.id
 		WHERE eg.invitation_code = ? AND eg.event_id = ?
 	`).get(invitationCode, eventId);
 
 	if (!guestInfo) return res.status(404).json({ message: 'Invalid badge' });
 
-	db.prepare(`
-		UPDATE events_guests 
-		SET attended = 1, attended_date = CURRENT_TIMESTAMP 
-		WHERE invitation_code = ? AND event_id = ?
-	`).run(invitationCode, eventId);
+	db.prepare('UPDATE events_guests SET attended = 1, attended_date = CURRENT_TIMESTAMP WHERE invitation_code = ? AND event_id = ?').run(invitationCode, eventId);
 
 	res.json({
 		success: true,
 		message: 'Attendance validated',
-		guestName: `${guestInfo.name} ${guestInfo.surname}`,
+		guestName: `${guestInfo.name || ''} ${guestInfo.surname || ''}`.trim(),
 		eventName: guestInfo.event_name
 	});
 });

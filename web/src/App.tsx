@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Login from '@/pages/Login';
+import Home from '@/pages/Home';
 import Events from '@/pages/Events';
 import EventEdit from './pages/EventEdit';
 import Guests from '@/pages/Guests';
@@ -11,6 +12,7 @@ import Sponsors from '@/pages/Sponsors';
 import PublicConfirmation from '@/pages/PublicConfirmation';
 import AdminLayout from '@/layouts/AdminLayout';
 import Companies from '@/pages/Companies';
+import ScanAccess from '@/pages/ScanAccess';
 
 const getUserType = (): string | null => {
   const userStr = localStorage.getItem('user');
@@ -33,6 +35,8 @@ const ProtectedRoute = ({ allowedTypes }: { allowedTypes?: string[] }) => {
         case 'admin':
         case 'manager':
           return <Navigate to="/admin" replace />;
+        case 'user':
+          return <Navigate to="/admin/scan" replace />;
         default:
           return <Navigate to="/login" replace />;
       }
@@ -58,17 +62,24 @@ function App() {
           </Route>
         </Route>
 
-        {/* Private Routes — Admin / Manager */}
-        <Route element={<ProtectedRoute allowedTypes={['admin', 'manager']} />}>
+        {/* Private Routes — Admin / Manager / User */}
+        <Route element={<ProtectedRoute allowedTypes={['admin', 'manager', 'user']} />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Events />} />
+            <Route index element={
+              getUserType() === 'user' ? <Navigate to="/admin/scan" replace /> : <Events />
+            } />
 
-            <Route path="events/new" element={<EventEdit />} />
-            <Route path="events/:id" element={<EventEdit />} />
-            <Route path="events/:id/guests" element={<EventsGuests />} />
-            <Route path="events/:id/sponsors" element={<EventsSponsors />} />
-            <Route path="guests" element={<Guests />} />
-            <Route path="sponsors" element={<Sponsors />} />
+            <Route path="scan" element={<ScanAccess />} />
+
+            {/* Admin and Manager only */}
+            <Route element={<ProtectedRoute allowedTypes={['admin', 'manager']} />}>
+              <Route path="events/new" element={<EventEdit />} />
+              <Route path="events/:id" element={<EventEdit />} />
+              <Route path="events/:id/guests" element={<EventsGuests />} />
+              <Route path="events/:id/sponsors" element={<EventsSponsors />} />
+              <Route path="guests" element={<Guests />} />
+              <Route path="sponsors" element={<Sponsors />} />
+            </Route>
 
             {/* Only admin */}
             <Route element={<ProtectedRoute allowedTypes={['admin']} />}>
@@ -77,7 +88,7 @@ function App() {
             </Route>
           </Route>
         </Route>
-        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/" element={<Home />} />
       </Routes>
     </Router>
   );

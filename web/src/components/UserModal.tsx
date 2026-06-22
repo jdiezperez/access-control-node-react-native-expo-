@@ -276,12 +276,12 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 required
                                 value={formData.type}
                                 onChange={e => setFormData({ ...formData, type: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
+                                disabled={!!(userToEdit && currentUserType === 'manager')}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {currentUserType === 'admin' && (
-                                    <option value="admin">Administrator</option>
+                                    <option value="manager">Manager</option>
                                 )}
-                                <option value="manager">Manager</option>
                                 <option value="user">Scanner Staff</option>
                             </select>
                         </div>
