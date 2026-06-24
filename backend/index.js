@@ -387,7 +387,7 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 
 // PUT Update User (Managers & Guests)
 app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const { name, surname, email, type, city, country, organization, role, gender, image } = req.body;
+	const { name, surname, email, type, role, password } = req.body;
 
 	// Validation: manager cannot promote/demote admin & user must be in same company
 	const userToEdit = db.prepare('SELECT type, company_id FROM users WHERE id = ?').get(req.params.id);
@@ -417,10 +417,18 @@ app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) 
 	}
 
 	try {
-		db.prepare(`
-			UPDATE users SET name = ?, surname = ?, email = ?, type = ?, city = ?, country = ?, organization = ?, role = ?, gender = ?, image = ?
-			WHERE id = ? AND company_id = ?
-		`).run(name, surname, email, type, city, country, organization, role, gender, image, req.params.id, req.user.company_id);
+		if (password) {
+			const hashedPassword = bcrypt.hashSync(password, 10);
+			db.prepare(`
+				UPDATE users SET name = ?, surname = ?, email = ?, type = ?, role = ?, password = ?
+				WHERE id = ? AND company_id = ?
+			`).run(name, surname, email, type, role, hashedPassword, req.params.id, req.user.company_id);
+		} else {
+			db.prepare(`
+				UPDATE users SET name = ?, surname = ?, email = ?, type = ?, role = ?
+				WHERE id = ? AND company_id = ?
+			`).run(name, surname, email, type, role, req.params.id, req.user.company_id);
+		}
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Update failed: ' + err.message });

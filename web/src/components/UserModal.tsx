@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Shield, Briefcase, Eye, EyeOff, Loader2, Save, Upload } from 'lucide-react';
+import { X, User, Mail, Shield, Briefcase, Eye, EyeOff, Loader2, Save } from 'lucide-react';
 import axios from 'axios';
 
 interface UserModalProps {
@@ -18,13 +18,10 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
         password: '',
         confirmPassword: '',
         role: '',
-        gender: '',
         type: 'user',
-        image: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentUserType, setCurrentUserType] = useState<string>('');
 
@@ -43,9 +40,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                 password: '',
                 confirmPassword: '',
                 role: userToEdit.role || '',
-                gender: userToEdit.gender || '',
                 type: userToEdit.type || 'user',
-                image: userToEdit.image || ''
             });
         } else {
             setFormData({
@@ -55,54 +50,46 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                 password: '',
                 confirmPassword: '',
                 role: '',
-                gender: '',
                 type: 'user',
-                image: ''
             });
         }
     }, [userToEdit, isOpen]);
 
     if (!isOpen) return null;
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const formDataUpload = new FormData();
-        formDataUpload.append('image', file);
-
-        try {
-            setUploading(true);
-            const token = localStorage.getItem('token');
-            const res = await axios.post('/api/admin/upload?folder=users', formDataUpload, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setFormData(prev => ({ ...prev, image: res.data.url }));
-        } catch (err: any) {
-            setError('Failed to upload image');
-        } finally {
-            setUploading(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
-        if (!userToEdit && (!formData.password || formData.password !== formData.confirmPassword)) {
-            setError("Passwords don't match or are empty");
-            return;
+        if (userToEdit) {
+            if (formData.password && formData.password !== formData.confirmPassword) {
+                setError("Passwords don't match");
+                return;
+            }
+        } else {
+            if (!formData.password || formData.password !== formData.confirmPassword) {
+                setError("Passwords don't match or are empty");
+                return;
+            }
         }
 
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const payload = {
-                ...formData,
-                organization: companyInfo.name,
-                city: companyInfo.city,
-                country: companyInfo.country
+
+            // Only send fields that exist in the users table
+            const payload: Record<string, string> = {
+                name: formData.name,
+                surname: formData.surname,
+                email: formData.email,
+                type: formData.type,
+                role: formData.role,
             };
+
+            // Only include password if it was actually filled in
+            if (formData.password) {
+                payload.password = formData.password;
+            }
 
             if (userToEdit) {
                 await axios.put(`/api/admin/users/${userToEdit.id}`, payload, {
@@ -147,28 +134,6 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                         </div>
                     )}
 
-                    {/* Image Upload */}
-                    <div className="flex justify-center pb-4">
-                        <div className="relative group">
-                            <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
-                                {formData.image ? (
-                                    <img src={formData.image} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <User className="text-slate-300" size={40} />
-                                )}
-                                {uploading && (
-                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                                        <Loader2 className="animate-spin text-primary" size={20} />
-                                    </div>
-                                )}
-                            </div>
-                            <label className="absolute -bottom-1 -right-1 p-2 bg-primary text-white rounded-full shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                                <Upload size={14} />
-                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                            </label>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-500 uppercase">First Name *</label>
@@ -204,39 +169,40 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                             </div>
                         </div>
 
-                        {!userToEdit && (
-                            <>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Password *</label>
-                                    <div className="relative">
-                                        <input
-                                            required
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={formData.password}
-                                            onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                        >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Confirm Password *</label>
-                                    <input
-                                        required
-                                        type="password"
-                                        value={formData.confirmPassword}
-                                        onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                    />
-                                </div>
-                            </>
-                        )}
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                {userToEdit ? 'New Password' : 'Password *'}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    required={!userToEdit}
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={formData.password}
+                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                    placeholder={userToEdit ? 'Leave blank to keep current' : ''}
+                                    className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">
+                                {userToEdit ? 'Confirm New Password' : 'Confirm Password *'}
+                            </label>
+                            <input
+                                required={!userToEdit && !!formData.password}
+                                type="password"
+                                value={formData.confirmPassword}
+                                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                            />
+                        </div>
 
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
@@ -250,22 +216,6 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 placeholder="e.g. Manager, Coordinator"
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                             />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Gender</label>
-                            <select
-                                value={formData.gender}
-                                onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
-                            >
-                                <option value="">Select Gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="non binary">Non Binary</option>
-                                <option value="other">Other</option>
-                                <option value="prefer not to say">Prefer not to say</option>
-                            </select>
                         </div>
 
                         <div className="space-y-2">
