@@ -117,20 +117,21 @@ const UsersManagement = () => {
                             <tr>
                                 <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-widest">User Details</th>
                                 <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-widest">Role &amp; Permissions</th>
+                                <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned Events</th>
                                 <th className="px-8 py-5 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {filteredUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={3} className="px-8 py-12 text-center text-slate-500 font-medium">
+                                    <td colSpan={4} className="px-8 py-12 text-center text-slate-500 font-medium">
                                         No users found matching your search.
                                     </td>
                                 </tr>
                             ) : filteredUsers.map(user => {
                                 const isSelf = user.id === currentUserId;
                                 const canEdit = currentUserType === 'admin' || (currentUserType === 'manager' && user.type === 'user');
-                                const canAssignEvents = user.type === 'user' && (currentUserType === 'admin' || currentUserType === 'manager');
+                                const canAssignEvents = currentUserType === 'admin' || currentUserType === 'manager';
                                 return (
                                     <tr key={user.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-8 py-6">
@@ -152,14 +153,28 @@ const UsersManagement = () => {
                                         <td className="px-8 py-6">
                                             <div className="space-y-1.5">
                                                 <div className="text-sm font-bold text-slate-300">{user.role || 'No Role Assigned'}</div>
-                                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                    user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                                    user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                }`}>
+                                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                                        user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    }`}>
                                                     {user.type === 'admin' ? <Shield size={10} /> : <User size={10} />}
                                                     {user.type}
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="text-sm text-slate-300 max-w-[250px]">
+                                                {user.assignedEvents && user.assignedEvents.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {user.assignedEvents.map((eventName: string, i: number) => (
+                                                            <span key={i} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-semibold rounded-md">
+                                                                {eventName}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-500 italic text-xs">No events assigned</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
@@ -204,7 +219,7 @@ const UsersManagement = () => {
                 ) : filteredUsers.map(user => {
                     const isSelf = user.id === currentUserId;
                     const canEdit = currentUserType === 'admin' || (currentUserType === 'manager' && user.type === 'user');
-                    const canAssignEvents = user.type === 'user' && (currentUserType === 'admin' || currentUserType === 'manager');
+                    const canAssignEvents = currentUserType === 'admin' || currentUserType === 'manager';
                     return (
                         <div key={user.id} className="rounded-2xl border border-white/10 p-4 flex items-start gap-4" style={{ background: 'rgba(255,255,255,0.05)' }}>
                             <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 overflow-hidden border border-white/10 flex-shrink-0">
@@ -218,11 +233,24 @@ const UsersManagement = () => {
                                 <div className="text-xs text-slate-400 mt-0.5 truncate">{user.email}</div>
                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                                     <span className="text-xs text-slate-300 font-semibold">{user.role || 'No Role'}</span>
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                                        user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                        user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                    }`}>{user.type}</span>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                            user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        }`}>{user.type}</span>
+                                </div>
+                                <div className="mt-2 text-xs text-slate-300">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Assigned Events</span>
+                                    {user.assignedEvents && user.assignedEvents.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            {user.assignedEvents.map((eventName: string, i: number) => (
+                                                <span key={i} className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-semibold rounded-md">
+                                                    {eventName}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-500 italic text-[10px]">No events assigned</span>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1.5 flex-shrink-0">
