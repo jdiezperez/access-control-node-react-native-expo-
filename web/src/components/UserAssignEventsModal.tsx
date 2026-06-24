@@ -4,6 +4,8 @@ import {
     X, CalendarDays, MapPin, Loader2, CheckCircle2,
     Circle, Search, Zap, Clock, Save
 } from 'lucide-react';
+import { getImagePath } from '@/utils/imagePath';
+
 
 interface Event {
     id: number;
@@ -154,11 +156,10 @@ const UserAssignEventsModal = ({ isOpen, onClose, user }: UserAssignEventsModalP
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
-                                    filter === f
-                                        ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
-                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
-                                }`}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${filter === f
+                                    ? 'bg-primary text-white border-primary shadow-md shadow-primary/20'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                                    }`}
                             >
                                 {f === 'all' ? 'All Events' : f === 'active' ? 'Active' : 'Not Active'}
                             </button>
@@ -189,11 +190,10 @@ const UserAssignEventsModal = ({ isOpen, onClose, user }: UserAssignEventsModalP
                                         key={event.id}
                                         onClick={() => !isSaving && handleToggle(event)}
                                         disabled={isSaving}
-                                        className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition-all text-left group ${
-                                            isAssigned
-                                                ? 'border-primary/30 bg-primary/5 hover:bg-primary/10'
-                                                : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
-                                        } ${isSaving ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}
+                                        className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition-all text-left group ${isAssigned
+                                            ? 'border-primary/30 bg-primary/5 hover:bg-primary/10'
+                                            : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
+                                            } ${isSaving ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}
                                     >
                                         {/* Checkbox Icon */}
                                         <div className="flex-shrink-0">
@@ -209,7 +209,7 @@ const UserAssignEventsModal = ({ isOpen, onClose, user }: UserAssignEventsModalP
                                         {/* Event Logo */}
                                         <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 overflow-hidden border border-slate-200">
                                             {event.logo ? (
-                                                <img src={event.logo} alt={event.name} className="w-full h-full object-cover" />
+                                                <img src={getImagePath(event.logo, 'events')} alt={event.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <CalendarDays className="text-slate-400" size={18} />
                                             )}
@@ -264,11 +264,10 @@ const UserAssignEventsModal = ({ isOpen, onClose, user }: UserAssignEventsModalP
 
                 {/* Toast */}
                 {toast && (
-                    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-2 transition-all ${
-                        toast.type === 'success'
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-red-500 text-white'
-                    }`}>
+                    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-2 transition-all ${toast.type === 'success'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-red-500 text-white'
+                        }`}>
                         {toast.type === 'success' ? <CheckCircle2 size={16} /> : <X size={16} />}
                         {toast.msg}
                     </div>
