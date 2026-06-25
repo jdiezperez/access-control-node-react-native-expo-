@@ -141,8 +141,8 @@ const EventEdit = () => {
 					<button
 						onClick={() => setActiveTab('info')}
 						className={`flex-1 px-6 py-4 text-sm font-semibold transition-all ${activeTab === 'info'
-								? 'text-white border-b-2 border-blue-500'
-								: 'text-slate-400 hover:text-slate-300'
+							? 'text-white border-b-2 border-blue-500'
+							: 'text-slate-400 hover:text-slate-300'
 							}`}
 					>
 						Event Info
@@ -153,8 +153,8 @@ const EventEdit = () => {
 							disabled={event.status !== 'not active'}
 							title={event.status !== 'not active' ? 'Cannot edit Guest Data when event is Active or Completed' : ''}
 							className={`flex-1 px-6 py-4 text-sm font-semibold transition-all border-l border-white/10 ${activeTab === 'fields'
-									? 'text-white border-b-2 border-blue-500'
-									: 'text-slate-400 hover:text-slate-300'
+								? 'text-white border-b-2 border-blue-500'
+								: 'text-slate-400 hover:text-slate-300'
 								} ${event.status !== 'not active' ? 'opacity-50 cursor-not-allowed' : ''}`}
 						>
 							Guest Data
@@ -289,7 +289,7 @@ const EventEdit = () => {
 								{/* Date */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Calendar size={14} className="text-primary" /> Date
+										<Calendar size={14} className="text-white" /> Date
 									</label>
 									<input
 										type="date"

@@ -20,3 +20,8 @@
     @apply px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50;
   }
 }
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
