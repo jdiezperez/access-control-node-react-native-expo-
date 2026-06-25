@@ -122,7 +122,7 @@ export default function NavBar() {
                                 <XMarkIcon aria-hidden="true" className="hidden size-6 group-data-open:block" />
                             </DisclosureButton>
                         </div>
-                        <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
+                        <div className="flex flex-1 items-center justify-start pl-12 sm:pl-0">
                             <div className="flex shrink-0 items-center">
                                 {logo ? (
                                     <img
