@@ -88,9 +88,9 @@ const UsersManagement = () => {
             </div>
 
             {/* Top Cards Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative md:col-span-2">
+                    <Search className="absolute left-4 top-1/3 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                         type="text"
                         placeholder="Search by name, email or role..."
@@ -154,8 +154,8 @@ const UsersManagement = () => {
                                             <div className="space-y-1.5">
                                                 <div className="text-sm font-bold text-slate-300">{user.role || 'No Role Assigned'}</div>
                                                 <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                                        user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                                     }`}>
                                                     {user.type === 'admin' ? <Shield size={10} /> : <User size={10} />}
                                                     {user.type}
@@ -234,8 +234,8 @@ const UsersManagement = () => {
                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                                     <span className="text-xs text-slate-300 font-semibold">{user.role || 'No Role'}</span>
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${user.type === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                            user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        user.type === 'manager' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                            'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                         }`}>{user.type}</span>
                                 </div>
                                 <div className="mt-2 text-xs text-slate-300">
