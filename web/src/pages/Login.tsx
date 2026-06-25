@@ -32,10 +32,10 @@ const Login = () => {
                 navigate('/admin');
             }
         } catch (err: unknown) {
-            if (err instanceof Error) {
+            if (axios.isAxiosError(err)) {
+                setError(err.response?.data?.message || 'Error desconocido');
+            } else if (err instanceof Error) {
                 setError(err.message);
-            } else {
-                setError('Login failed. Please check your credentials.');
             }
         } finally {
             setLoading(false);
@@ -95,8 +95,8 @@ const Login = () => {
                             </div>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={loading}
                             className="w-full text-white py-4 rounded-2xl text-lg font-bold shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
