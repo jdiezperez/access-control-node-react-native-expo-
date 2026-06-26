@@ -134,7 +134,8 @@ app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res)
 			company_id,
 			name,
 			surname,
-			email
+			email,
+			role
 		FROM users
 		WHERE type = 'admin'
 	`).all();
@@ -172,8 +173,8 @@ app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res
 		const hashedPassword = bcrypt.hashSync(admin.password, 10);
 
 		const userInfo = db.prepare(
-			'INSERT INTO users (name, surname, email, password, type, company_id) VALUES (?, ?, ?, ?, ?, ?)'
-		).run(admin.name, admin.surname, admin.email, hashedPassword, 'admin', companyId);
+			'INSERT INTO users (name, surname, email, password, type, role, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+		).run(admin.name, admin.surname, admin.email, hashedPassword, 'admin', admin.role || null, companyId);
 
 		return { companyId, adminId: userInfo.lastInsertRowid };
 	});
@@ -203,12 +204,12 @@ app.put('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, 
         if (admin.password && admin.password.length > 0) {
             const hashedPassword = bcrypt.hashSync(admin.password, 10);
 	    	db.prepare(
-		    	'UPDATE users SET name = ?, surname = ?, email = ?, password = ? WHERE id = ?'
-		    ).run(admin.name, admin.surname, admin.email, hashedPassword, adminUser.id);
+		    	'UPDATE users SET name = ?, surname = ?, email = ?, password = ?, role = ? WHERE id = ?'
+		    ).run(admin.name, admin.surname, admin.email, hashedPassword, admin.role || null, adminUser.id);
         } else {
             db.prepare(
-		    	'UPDATE users SET name = ?, surname = ?, email = ? WHERE id = ?'
-		    ).run(admin.name, admin.surname, admin.email, adminUser.id);
+		    	'UPDATE users SET name = ?, surname = ?, email = ?, role = ? WHERE id = ?'
+		    ).run(admin.name, admin.surname, admin.email, admin.role || null, adminUser.id);
         }
         return { success: true };
     });

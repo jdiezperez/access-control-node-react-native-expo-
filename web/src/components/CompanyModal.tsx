@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     X, Building2, Mail, Phone, MapPin, User,
-    Lock, Eye, EyeOff, Loader2, Save, ShieldCheck, Upload, Image
+    Lock, Eye, EyeOff, Loader2, Save, ShieldCheck, Upload, Image, Briefcase
 } from 'lucide-react';
 import axios from 'axios';
 import { getImagePath } from '@/utils/imagePath';
@@ -28,6 +28,7 @@ const defaultAdminForm = {
     name: '',
     surname: '',
     email: '',
+    role: '',
     password: '',
     confirmPassword: '',
 };
@@ -57,9 +58,10 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                 logo: companyToEdit.logo || '',
             });
             setAdminForm({
-                name: companyToEdit.admin.name || '',
-                surname: companyToEdit.admin.surname || '',
-                email: companyToEdit.admin.email || '',
+                name: companyToEdit.admin?.name || '',
+                surname: companyToEdit.admin?.surname || '',
+                email: companyToEdit.admin?.email || '',
+                role: companyToEdit.admin?.role || '',
                 password: '',
                 confirmPassword: '',
             });
@@ -135,6 +137,7 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                     name: adminForm.name,
                     surname: adminForm.surname,
                     email: adminForm.email,
+                    role: adminForm.role,
                     password: adminForm.password,
                 }
             };
@@ -390,6 +393,20 @@ const CompanyModal = ({ isOpen, onClose, onSave, companyToEdit }: CompanyModalPr
                                         value={adminForm.email}
                                         onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
                                         placeholder="admin@company.com"
+                                        className={inputClass + ' pl-10'}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>Admin Role</label>
+                                <div className="relative">
+                                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                                    <input
+                                        type="text"
+                                        value={adminForm.role}
+                                        onChange={e => setAdminForm({ ...adminForm, role: e.target.value })}
+                                        placeholder="CEO / Administrator / Manager"
                                         className={inputClass + ' pl-10'}
                                     />
                                 </div>

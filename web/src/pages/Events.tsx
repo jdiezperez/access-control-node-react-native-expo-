@@ -73,7 +73,7 @@ const Events = () => {
 					<Plus size={20} /> New Event
 				</button>
 			</div>
-            {events.length}
+			{events.length}
 			{events.length === 0 ? (
 				<div className="flex flex-col items-center justify-center min-h-[300px] gap-4 rounded-3xl border border-white/10 p-12" style={{ background: 'rgba(255,255,255,0.03)' }}>
 					<div className="p-5 rounded-3xl" style={{ background: 'rgba(59,130,246,0.15)' }}>
