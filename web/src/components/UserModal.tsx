@@ -31,9 +31,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
         if (currentUserStr) {
             const currentUser = JSON.parse(currentUserStr);
             setCurrentUserType(currentUser.type);
-            if (userToEdit) console.log("currentUser.id", currentUser.id, "userToEdit.id", userToEdit.id);
             if (userToEdit && currentUser.id == userToEdit.id) {
-                console.log("SISISISISI");
                 setEditingProfile(true);
             }
         }

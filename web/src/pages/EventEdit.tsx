@@ -29,7 +29,6 @@ const EventEdit = () => {
 	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
 	const state = location.state as { tab?: string } | null;
-	console.log('Location state:', state);
 	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
 	);
 

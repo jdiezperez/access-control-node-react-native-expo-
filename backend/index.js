@@ -381,8 +381,8 @@ app.post('/api/admin/upload', authenticateToken, isManagerOrAdmin, upload.single
 	res.json({ url });
 });
 
-// GET Company info for the logged-in user
-app.get('/api/admin/companies', authenticateToken, isStaff, async (req, res) => {
+// GET Company info for the logged-in user (both /company and /companies are supported)
+app.get(['/api/admin/companies', '/api/admin/company'], authenticateToken, isStaff, async (req, res) => {
 	try {
 		console.log('Fetching company info for user:', req.user);
 		const company = await Company.findByPk(req.user.company_id);
@@ -453,6 +453,26 @@ app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res
 		}));
 
 		res.json(enrichedUsers);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+});
+
+// GET single user
+app.get('/api/admin/users/:id', authenticateToken, isStaff, async (req, res) => {
+	try {
+		const user = await User.findByPk(req.params.id, {
+			attributes: { exclude: ['password'] }
+		});
+		if (!user) return res.status(404).json({ message: 'User not found' });
+
+		// Ensure user belongs to the same company
+		if (req.user.type !== 'superadmin' && user.company_id !== req.user.company_id) {
+			return res.status(403).json({ message: 'Access denied' });
+		}
+
+		res.json(user);
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ message: 'Internal server error' });
