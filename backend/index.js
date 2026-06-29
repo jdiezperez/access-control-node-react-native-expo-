@@ -424,14 +424,16 @@ app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res
 				where: {
 					type: type,
 					company_id: req.user.company_id
-				}
+				},
+				order: [['surname', 'ASC']]
 			});
 		} else {
 			users = await User.findAll({
 				where: {
 					company_id: req.user.company_id,
 					type: { [Op.ne]: 'admin' }
-				}
+				},
+				order: [['surname', 'ASC']]
 			});
 		}
 

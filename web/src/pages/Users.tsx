@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users as UsersIcon, Plus, Search, Mail, Shield, User, Trash2, Edit2, Loader2, Building2, CalendarPlus } from 'lucide-react';
+import { Users as UsersIcon, Plus, Search, Mail, Shield, User, Trash2, Edit2, Loader2, Building2, CalendarPlus, AlertTriangle } from 'lucide-react';
 import UserModal from '@/components/UserModal';
 import UserAssignEventsModal from '@/components/UserAssignEventsModal';
 
@@ -12,6 +12,8 @@ const UsersManagement = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [assignUser, setAssignUser] = useState<any>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+    const [deleting, setDeleting] = useState<boolean>(false);
     const token = localStorage.getItem('token');
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     const currentUserType = currentUser.type || '';
@@ -39,14 +41,18 @@ const UsersManagement = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+        setDeleting(true);
         try {
             await axios.delete(`/api/admin/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUsers(users.filter(u => u.id !== id));
+            setShowDeleteConfirm(false);
         } catch (err) {
+            console.error(err);
             alert('Failed to delete user');
+            setDeleting(false);
+            setShowDeleteConfirm(false);
         }
     };
 
@@ -193,7 +199,7 @@ const UsersManagement = () => {
                                                     </button>
                                                 )}
                                                 {canEdit && !isSelf && (
-                                                    <button onClick={() => handleDelete(user.id)} title="Delete user"
+                                                    <button onClick={() => { setSelectedUser(user); setShowDeleteConfirm(true) }} title="Delete user"
                                                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all">
                                                         <Trash2 size={16} />
                                                     </button>
@@ -292,7 +298,53 @@ const UsersManagement = () => {
                 onClose={() => setAssignUser(null)}
                 user={assignUser}
             />
-        </div>
+
+            {/* Delete Confirmation Modal */}
+            {
+                showDeleteConfirm && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+                        <div className="w-full max-w-md rounded-3xl border border-red-500/20 p-8 space-y-6 shadow-2xl" style={{ background: 'rgba(20,10,10,0.95)' }}>
+                            {/* Icon + Title */}
+                            <div className="flex flex-col items-center gap-4 text-center">
+                                <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                                    <AlertTriangle size={32} className="text-red-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white mb-1">Delete User?</h3>
+                                    <p className="text-slate-400 text-sm font-semibold">{selectedUser.name} {selectedUser.surname}</p>
+                                </div>
+                            </div>
+
+                            {/* Warning box */}
+                            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 space-y-2">
+                                <p className="text-red-400 text-xs font-bold uppercase tracking-widest">This action is permanent and cannot be undone.</p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    disabled={deleting}
+                                    className="flex-1 px-4 py-3 rounded-2xl border border-white/10 bg-white/5 text-slate-300 font-bold text-sm hover:bg-white/10 transition-all disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(selectedUser.id)}
+                                    disabled={deleting}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-all disabled:opacity-50"
+                                >
+                                    {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                    {deleting ? 'Deleting…' : 'Yes, Delete User'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 
