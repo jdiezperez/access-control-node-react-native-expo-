@@ -50,6 +50,7 @@ const UsersManagement = () => {
         }
     };
 
+    console.log(users);
     const filteredUsers = users.filter(u =>
         [u.name, u.surname, u.email, u.role].some(v => v?.toLowerCase().includes(search.toLowerCase()))
     );

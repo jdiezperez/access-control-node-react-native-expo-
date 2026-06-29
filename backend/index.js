@@ -414,7 +414,7 @@ app.put('/api/admin/companies', authenticateToken, isStaff, async (req, res) => 
 	}
 });
 
-// GET Users (Admins & Guests)
+// GET Users
 app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const type = req.query.type;
 	try {
@@ -480,7 +480,7 @@ app.get('/api/admin/users/:id', authenticateToken, isStaff, async (req, res) => 
 
 // POST Create User (Managers & Guests)
 app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res) => {
-	const { name, surname, email, type, password, city, country, organization, role, gender } = req.body;
+	const { name, surname, email, type, password, role } = req.body;
 
 	if (type === 'superadmin') {
 		return res.status(403).json({ message: 'SuperAdmin users cannot be created' });
@@ -500,12 +500,9 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, re
 			name,
 			surname,
 			email,
+			role,
 			type: type || 'guest',
 			password: hashedPassword,
-			// Note: If you want to store city/country/organization/gender in User model, you should define them.
-			// Currently, the original SQLite DB schema for users did not have city, country, organization, gender.
-			// But the original code was trying to insert them: they would just be ignored if not in DB, or fail.
-			// Let's keep them in create, they'll be ignored if not in Sequelize model.
 			company_id: req.user.company_id
 		});
 		res.json({ id: user.id });

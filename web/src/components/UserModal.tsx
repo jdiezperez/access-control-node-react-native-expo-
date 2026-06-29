@@ -242,7 +242,6 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 disabled={!!((userToEdit && currentUserType === 'manager') || editingProfile)}
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <option value="admin">Admin</option>
                                 <option value="manager">Manager</option>
                                 <option value="user">Scanner Staff</option>
                             </select>
