@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
 import CountrySelect from '@/components/CountrySelect';
 import EventFieldsBuilder from '@/components/EventFieldsBuilder';
@@ -27,6 +27,8 @@ const EventEdit = () => {
 
 	const isNew = id === 'new' || !id;
 	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
 	const state = location.state as { tab?: string } | null;
 	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
@@ -86,6 +88,22 @@ const EventEdit = () => {
 		} catch (err) {
 			console.error(err);
 			alert(`Error ${isNew ? 'creating' : 'updating'} event`);
+		}
+	};
+
+	const handleDelete = async () => {
+		setDeleting(true);
+		try {
+			await axios.delete(
+				`${import.meta.env.VITE_API_URL}/api/admin/events/${id}`,
+				{ headers: { Authorization: `Bearer ${token}` } }
+			);
+			navigate('/admin');
+		} catch (err) {
+			console.error(err);
+			alert('Failed to delete event. Please try again.');
+			setDeleting(false);
+			setShowDeleteConfirm(false);
 		}
 	};
 
@@ -203,7 +221,7 @@ const EventEdit = () => {
 								{/* Name */}
 								<div className="space-y-2 col-span-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Tag size={14} className="text-primary" /> Event Name
+										<Tag size={14} className="text-primary" /> Event Name <span className="text-red-400">*</span>
 									</label>
 									<input
 										type="text"
@@ -288,11 +306,12 @@ const EventEdit = () => {
 								{/* Date */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Calendar size={14} className="text-white" /> Date
+										<Calendar size={14} className="text-white" /> Date <span className="text-red-400">*</span>
 									</label>
 									<input
 										type="date"
 										name="date"
+										required
 										value={event.date || ''}
 										onChange={handleChange}
 										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
@@ -303,11 +322,12 @@ const EventEdit = () => {
 								{/* City */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<MapPin size={14} className="text-primary" /> City
+										<MapPin size={14} className="text-primary" /> City <span className="text-red-400">*</span>
 									</label>
 									<input
 										type="text"
 										name="city"
+										required
 										value={event.city || ''}
 										onChange={handleChange}
 										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
@@ -318,11 +338,12 @@ const EventEdit = () => {
 								{/* Country */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<MapPin size={14} className="text-primary" /> Country
+										<MapPin size={14} className="text-primary" /> Country <span className="text-red-400">*</span>
 									</label>
 									<CountrySelect
 										value={event.country || ''}
 										onChange={v => setEvent({ ...event, country: v })}
+										required
 										className="w-full px-4 pt-3 pb-4 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-[#293143]"
 										style={{ background: 'rgba(255,255,255,0.03)' }}
 									/>
@@ -390,27 +411,26 @@ const EventEdit = () => {
 							/>
 						</>
 					)}
-				</form>
 
-				<div className="px-8 py-4 border-t border-white/5 flex justify-between items-center bg-black/10">
-					{(!isNew && activeTab === 'info') ? (
+					<div className="px-8 py-4 border-t border-white/5 flex justify-between items-center bg-black/10">
+						{(!isNew && activeTab === 'info') ? (
+							<button
+								type="button"
+								className="flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors"
+								onClick={() => setShowDeleteConfirm(true)}
+							>
+								<Trash2 size={16} /> Delete Event
+							</button>
+						) : <div></div>}
 						<button
-							type="button"
-							className="flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors"
-							onClick={() => alert('Delete functionality not implemented yet')}
+							type="submit"
+							className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+							style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
 						>
-							<Trash2 size={16} /> Delete Event
+							<Save size={16} /> {isNew ? 'Create Event' : 'Save Changes'}
 						</button>
-					) : <div></div>}
-					<button
-						type="submit"
-						onClick={handleSubmit}
-						className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-						style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-					>
-						<Save size={16} /> {isNew ? 'Create Event' : 'Save Changes'}
-					</button>
-				</div>
+					</div>
+				</form>
 			</div>
 
 			{/* Template Selector Modal */}
@@ -423,6 +443,58 @@ const EventEdit = () => {
 						setShowTemplateSelector(false);
 					}}
 				/>
+			)}
+
+			{/* Delete Confirmation Modal */}
+			{showDeleteConfirm && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+					<div className="w-full max-w-md rounded-3xl border border-red-500/20 p-8 space-y-6 shadow-2xl" style={{ background: 'rgba(20,10,10,0.95)' }}>
+						{/* Icon + Title */}
+						<div className="flex flex-col items-center gap-4 text-center">
+							<div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+								<AlertTriangle size={32} className="text-red-400" />
+							</div>
+							<div>
+								<h3 className="text-xl font-black text-white mb-1">Delete Event?</h3>
+								<p className="text-slate-400 text-sm font-semibold">{event.name}</p>
+							</div>
+						</div>
+
+						{/* Warning box */}
+						<div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 space-y-2">
+							<p className="text-red-400 text-xs font-bold uppercase tracking-widest">This action is permanent and cannot be undone.</p>
+							<p className="text-slate-300 text-sm">Deleting this event will permanently remove:</p>
+							<ul className="text-slate-400 text-sm space-y-1 list-disc list-inside">
+								<li>All guests and their registration data</li>
+								<li>All assigned users</li>
+								<li>All linked sponsors</li>
+								<li>All custom fields</li>
+								<li>The event logo image</li>
+							</ul>
+						</div>
+
+						{/* Actions */}
+						<div className="flex gap-3">
+							<button
+								type="button"
+								onClick={() => setShowDeleteConfirm(false)}
+								disabled={deleting}
+								className="flex-1 px-4 py-3 rounded-2xl border border-white/10 bg-white/5 text-slate-300 font-bold text-sm hover:bg-white/10 transition-all disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={handleDelete}
+								disabled={deleting}
+								className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm transition-all disabled:opacity-50"
+							>
+								{deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+								{deleting ? 'Deleting…' : 'Yes, Delete Event'}
+							</button>
+						</div>
+					</div>
+				</div>
 			)}
 		</div>
 	);

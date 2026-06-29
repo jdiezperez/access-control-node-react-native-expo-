@@ -384,7 +384,6 @@ app.post('/api/admin/upload', authenticateToken, isManagerOrAdmin, upload.single
 // GET Company info for the logged-in user (both /company and /companies are supported)
 app.get(['/api/admin/companies', '/api/admin/company'], authenticateToken, isStaff, async (req, res) => {
 	try {
-		console.log('Fetching company info for user:', req.user);
 		const company = await Company.findByPk(req.user.company_id);
 		res.json(company || {});
 	} catch (err) {
@@ -886,7 +885,10 @@ app.get('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, re
 				where: { company_id: req.user.company_id }
 			});
 		} else {
-			events = await Event.findAll({ where: { company_id: req.user.company_id } });
+			events = await Event.findAll({
+				where: { company_id: req.user.company_id },
+				order: [['date']]
+			});
 		}
 		res.json(events);
 	} catch (err) {
@@ -1107,6 +1109,12 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 
 app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, city, country, date, email_template, status, logo } = req.body;
+
+	if (!name || !name.trim()) return res.status(400).json({ message: 'Event name is required' });
+	if (!date) return res.status(400).json({ message: 'Date is required' });
+	if (!city || !city.trim()) return res.status(400).json({ message: 'City is required' });
+	if (!country || !country.trim()) return res.status(400).json({ message: 'Country is required' });
+
 	try {
 		const eventId = await sequelize.transaction(async (t) => {
 			const event = await Event.create({
@@ -1162,7 +1170,45 @@ app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAss
 	}
 });
 
-// Admin Routes - Custom Event Fields
+// DELETE Event + all associated data
+app.delete('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const eventId = event.id;
+		const logoPath = event.logo; // e.g. "/uploads/events/filename.jpg"
+
+		await sequelize.transaction(async (t) => {
+			// GuestData rows are cascade-deleted when Fields are deleted (field_id FK CASCADE)
+			// EventGuest rows are also cascade-deleted when the Guest or Event is deleted,
+			// but we destroy them explicitly to be safe
+			await EventGuest.destroy({ where: { event_id: eventId }, transaction: t });
+			await EventUser.destroy({ where: { event_id: eventId }, transaction: t });
+			await EventSponsor.destroy({ where: { event_id: eventId }, transaction: t });
+			// Fields have GuestData linked via field_id CASCADE, so destroying Fields also cleans GuestData
+			await Field.destroy({ where: { event_id: eventId }, transaction: t });
+			await event.destroy({ transaction: t });
+		});
+
+		// Delete logo file from disk after transaction succeeds
+		if (logoPath) {
+			const absolutePath = path.join(__dirname, logoPath);
+			fs.unlink(absolutePath, (err) => {
+				if (err) console.warn('Could not delete logo file:', absolutePath, err.message);
+			});
+		}
+
+		res.json({ success: true });
+	} catch (err) {
+		console.error('Error deleting event:', err);
+		res.status(500).json({ message: 'Delete failed: ' + err.message });
+	}
+});
+
+
 app.get('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	try {
 		const event = await Event.findOne({
