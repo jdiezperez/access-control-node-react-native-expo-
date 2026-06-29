@@ -20,16 +20,22 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
         role: '',
         type: 'user',
     });
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [currentUserType, setCurrentUserType] = useState<string>('');
+    const [editingProfile, setEditingProfile] = useState<boolean>(false);
 
     useEffect(() => {
         const currentUserStr = localStorage.getItem('user');
         if (currentUserStr) {
             const currentUser = JSON.parse(currentUserStr);
             setCurrentUserType(currentUser.type);
+            if (userToEdit) console.log("currentUser.id", currentUser.id, "userToEdit.id", userToEdit.id);
+            if (userToEdit && currentUser.id == userToEdit.id) {
+                console.log("SISISISISI");
+                setEditingProfile(true);
+            }
         }
 
         if (userToEdit) {
@@ -109,8 +115,9 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
         }
     };
 
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" >
             <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <div className="flex items-center gap-3">
@@ -226,7 +233,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 required
                                 value={formData.type}
                                 onChange={e => setFormData({ ...formData, type: e.target.value })}
-                                disabled={!!(userToEdit && currentUserType === 'manager')}
+                                disabled={!!((userToEdit && currentUserType === 'manager') || editingProfile)}
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {currentUserType === 'admin' && (
@@ -258,7 +265,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                     </div>
                 </form>
             </div>
-        </div>
+        </div >
     );
 };
 

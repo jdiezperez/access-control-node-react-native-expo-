@@ -3,10 +3,26 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const db = require('./db');
 const multer = require('multer');
 const path = require('path');
 const axios = require('axios');
+const fs = require('fs');
+const { Op, Sequelize } = require('sequelize');
+
+const {
+	sequelize,
+	Company,
+	User,
+	Guest,
+	Event,
+	Sponsor,
+	EventSponsor,
+	EventGuest,
+	EventUser,
+	Field,
+	GuestData,
+	initDb
+} = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,8 +31,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-const fs = require('fs');
 
 // Multer Setup
 const storage = multer.diskStorage({
@@ -59,12 +73,17 @@ const isManagerOrAdmin = (req, res, next) => {
 	next();
 };
 
-const isEventAssigned = (req, res, next) => {
+const isEventAssigned = async (req, res, next) => {
 	const eventId = req.params.eventId || req.params.id;
 	if (!eventId) return next();
 
 	if (req.user.type === 'manager') {
-		const assigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
+		const assigned = await EventUser.findOne({
+			where: {
+				user_id: req.user.id,
+				event_id: eventId
+			}
+		});
 		if (!assigned) {
 			return res.status(403).json({ message: 'Access denied. You are not assigned to this event.' });
 		}
@@ -99,64 +118,70 @@ app.post('/api/superadmin/upload', authenticateToken, isSuperAdmin, upload.singl
 });
 
 // GET all companies (with stats)
-/*
-app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
-	const companies = db.prepare(`
-		SELECT 
-			c.*,
-			COUNT(DISTINCT CASE WHEN u.type != 'guest' THEN u.id END) as user_count,
-			COUNT(DISTINCT e.id) as event_count
-		FROM companies c
-		LEFT JOIN users u ON u.company_id = c.id
-		LEFT JOIN events e ON e.company_id = c.id
-		GROUP BY c.id
-		ORDER BY c.name ASC
-	`).all();
-	res.json(companies);
-});
-*/
-app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
-	const companies = db.prepare(`
-		SELECT
-			c.*,
-			COUNT(DISTINCT CASE WHEN u.type != 'guest' THEN u.id END) AS user_count,
-			COUNT(DISTINCT e.id) AS event_count
-		FROM companies c
-		LEFT JOIN users u ON u.company_id = c.id
-		LEFT JOIN events e ON e.company_id = c.id
-		GROUP BY c.id
-		ORDER BY c.name ASC
-	`).all();
+app.get('/api/superadmin/companies', authenticateToken, isSuperAdmin, async (req, res) => {
+	try {
+		// Use subqueries for database-agnostic counting
+		const companies = await Company.findAll({
+			attributes: {
+				include: [
+					[
+						sequelize.literal(`(
+							SELECT COUNT(DISTINCT u.id)
+							FROM users u
+							WHERE u.company_id = "Company".id AND u.type != 'guest'
+						)`),
+						'user_count'
+					],
+					[
+						sequelize.literal(`(
+							SELECT COUNT(DISTINCT e.id)
+							FROM events e
+							WHERE e.company_id = "Company".id
+						)`),
+						'event_count'
+					]
+				]
+			},
+			order: [['name', 'ASC']]
+		});
 
-	const admins = db.prepare(`
-		SELECT
-			id,
-			company_id,
-			name,
-			surname,
-			email,
-			role
-		FROM users
-		WHERE type = 'admin'
-	`).all();
+		const admins = await User.findAll({
+			where: { type: 'admin' },
+			attributes: ['id', 'company_id', 'name', 'surname', 'email', 'role']
+		});
 
-	const companiesWithAdmin = companies.map(company => ({
-		...company,
-		admin: admins.find(admin => admin.company_id === company.id) || null,
-	}));
+		const companiesWithAdmin = companies.map(c => {
+			const companyData = c.toJSON();
+			// Convert subquery string results to numbers if necessary
+			companyData.user_count = parseInt(companyData.user_count || 0, 10);
+			companyData.event_count = parseInt(companyData.event_count || 0, 10);
+			return {
+				...companyData,
+				admin: admins.find(admin => admin.company_id === companyData.id) || null,
+			};
+		});
 
-	res.json(companiesWithAdmin);
+		res.json(companiesWithAdmin);
+	} catch (err) {
+		console.error('Error fetching companies:', err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // GET single company
-app.get('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
-	const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-	res.json(company);
+app.get('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, async (req, res) => {
+	try {
+		const company = await Company.findByPk(req.params.id);
+		if (!company) return res.status(404).json({ message: 'Company not found' });
+		res.json(company);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // POST create company + initial admin user
-app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res) => {
+app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, async (req, res) => {
 	const { name, logo, address, email, phone, city, country, admin } = req.body;
 
 	if (!name) return res.status(400).json({ message: 'Company name is required' });
@@ -164,23 +189,33 @@ app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res
 		return res.status(400).json({ message: 'Admin user details (name, surname, email, password) are required' });
 	}
 
-	const createCompanyAndAdmin = db.transaction(() => {
-		const companyInfo = db.prepare(
-			'INSERT INTO companies (name, logo, address, email, phone, city, country) VALUES (?, ?, ?, ?, ?, ?, ?)'
-		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null);
-
-		const companyId = companyInfo.lastInsertRowid;
-		const hashedPassword = bcrypt.hashSync(admin.password, 10);
-
-		const userInfo = db.prepare(
-			'INSERT INTO users (name, surname, email, password, type, role, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-		).run(admin.name, admin.surname, admin.email, hashedPassword, 'admin', admin.role || null, companyId);
-
-		return { companyId, adminId: userInfo.lastInsertRowid };
-	});
-
 	try {
-		const result = createCompanyAndAdmin();
+		const result = await sequelize.transaction(async (t) => {
+			const company = await Company.create({
+				name,
+				logo: logo || null,
+				address: address || null,
+				email: email || null,
+				phone: phone || null,
+				city: city || null,
+				country: country || null
+			}, { transaction: t });
+
+			const hashedPassword = bcrypt.hashSync(admin.password, 10);
+
+			const user = await User.create({
+				name: admin.name,
+				surname: admin.surname,
+				email: admin.email,
+				password: hashedPassword,
+				type: 'admin',
+				role: admin.role || null,
+				company_id: company.id
+			}, { transaction: t });
+
+			return { companyId: company.id, adminId: user.id };
+		});
+
 		res.json({ success: true, companyId: result.companyId, adminId: result.adminId });
 	} catch (err) {
 		console.error('Error creating company:', err);
@@ -189,63 +224,80 @@ app.post('/api/superadmin/companies', authenticateToken, isSuperAdmin, (req, res
 });
 
 // PUT update company info
-app.put('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
+app.put('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, async (req, res) => {
 	const { name, logo, address, email, phone, city, country, admin } = req.body;
-	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-	const adminUser = db.prepare('SELECT id FROM users WHERE company_id = ? and type = ?').get([req.params.id, 'admin']);
-	if (!adminUser) return res.status(404).json({ message: 'Admin user not found' });
-
-    const updateCompanyAndAdmin = db.transaction(() => {
-		db.prepare(
-			'UPDATE companies SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?'
-		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null, req.params.id);
-
-        if (admin.password && admin.password.length > 0) {
-            const hashedPassword = bcrypt.hashSync(admin.password, 10);
-	    	db.prepare(
-		    	'UPDATE users SET name = ?, surname = ?, email = ?, password = ?, role = ? WHERE id = ?'
-		    ).run(admin.name, admin.surname, admin.email, hashedPassword, admin.role || null, adminUser.id);
-        } else {
-            db.prepare(
-		    	'UPDATE users SET name = ?, surname = ?, email = ?, role = ? WHERE id = ?'
-		    ).run(admin.name, admin.surname, admin.email, admin.role || null, adminUser.id);
-        }
-        return { success: true };
-    });
 
 	try {
-		const result = updateCompanyAndAdmin();
-        res.json(result);
+		const company = await Company.findByPk(req.params.id);
+		if (!company) return res.status(404).json({ message: 'Company not found' });
+
+		const adminUser = await User.findOne({
+			where: {
+				company_id: req.params.id,
+				type: 'admin'
+			}
+		});
+		if (!adminUser) return res.status(404).json({ message: 'Admin user not found' });
+
+		await sequelize.transaction(async (t) => {
+			await company.update({
+				name,
+				logo: logo || null,
+				address: address || null,
+				email: email || null,
+				phone: phone || null,
+				city: city || null,
+				country: country || null
+			}, { transaction: t });
+
+			const adminUpdateData = {
+				name: admin.name,
+				surname: admin.surname,
+				email: admin.email,
+				role: admin.role || null
+			};
+
+			if (admin.password && admin.password.length > 0) {
+				adminUpdateData.password = bcrypt.hashSync(admin.password, 10);
+			}
+
+			await adminUser.update(adminUpdateData, { transaction: t });
+		});
+
+		res.json({ success: true });
 	} catch (err) {
+		console.error(err);
 		res.status(400).json({ message: 'Update failed: ' + err.message });
 	}
 });
 
 // DELETE company + all associated data
-app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (req, res) => {
-	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.params.id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-
-	const deleteAll = db.transaction(() => {
-		// events_guests and events_sponsors are cascade deleted via FK when events/users are deleted
-		// But let's be explicit for safety
-		const eventIds = db.prepare('SELECT id FROM events WHERE company_id = ?').all(req.params.id).map(e => e.id);
-		if (eventIds.length > 0) {
-			const placeholders = eventIds.map(() => '?').join(',');
-			db.prepare(`DELETE FROM events_guests WHERE event_id IN (${placeholders})`).run(...eventIds);
-			db.prepare(`DELETE FROM events_users WHERE event_id IN (${placeholders})`).run(...eventIds);
-			db.prepare(`DELETE FROM events_sponsors WHERE event_id IN (${placeholders})`).run(...eventIds);
-		}
-
-		db.prepare('DELETE FROM events WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM sponsors WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM users WHERE company_id = ?').run(req.params.id);
-		db.prepare('DELETE FROM companies WHERE id = ?').run(req.params.id);
-	});
-
+app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, async (req, res) => {
 	try {
-		deleteAll();
+		const company = await Company.findByPk(req.params.id);
+		if (!company) return res.status(404).json({ message: 'Company not found' });
+
+		await sequelize.transaction(async (t) => {
+			const events = await Event.findAll({
+				where: { company_id: req.params.id },
+				attributes: ['id'],
+				transaction: t
+			});
+			const eventIds = events.map(e => e.id);
+
+			if (eventIds.length > 0) {
+				await EventGuest.destroy({ where: { event_id: { [Op.in]: eventIds } }, transaction: t });
+				await EventUser.destroy({ where: { event_id: { [Op.in]: eventIds } }, transaction: t });
+				await EventSponsor.destroy({ where: { event_id: { [Op.in]: eventIds } }, transaction: t });
+				await Field.destroy({ where: { event_id: { [Op.in]: eventIds } }, transaction: t });
+			}
+
+			await Event.destroy({ where: { company_id: req.params.id }, transaction: t });
+			await Sponsor.destroy({ where: { company_id: req.params.id }, transaction: t });
+			await User.destroy({ where: { company_id: req.params.id }, transaction: t });
+			await company.destroy({ transaction: t });
+		});
+
 		res.json({ success: true });
 	} catch (err) {
 		console.error('Error deleting company:', err);
@@ -254,29 +306,55 @@ app.delete('/api/superadmin/companies/:id', authenticateToken, isSuperAdmin, (re
 });
 
 // GET users of a specific company (for superadmin view)
-app.get('/api/superadmin/companies/:id/users', authenticateToken, isSuperAdmin, (req, res) => {
-	const users = db.prepare(
-		'SELECT id, name, surname, email, type, role, creation_date FROM users WHERE company_id = ? AND type != ? ORDER BY type ASC'
-	).all(req.params.id, 'guest');
-	res.json(users);
+app.get('/api/superadmin/companies/:id/users', authenticateToken, isSuperAdmin, async (req, res) => {
+	try {
+		const users = await User.findAll({
+			where: {
+				company_id: req.params.id,
+				type: { [Op.ne]: 'guest' }
+			},
+			attributes: ['id', 'name', 'surname', 'email', 'type', 'role', 'creation_date'],
+			order: [['type', 'ASC']]
+		});
+		res.json(users);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // ─── Auth Routes ───────────────────────────────────────────────────────
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
 	const { email, password } = req.body;
-	const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+	try {
+		const user = await User.findOne({ where: { email } });
 
-	if (!user || !bcrypt.compareSync(password, user.password)) {
-		return res.status(401).json({ message: 'Invalid credentials' });
+		if (!user || !bcrypt.compareSync(password, user.password)) {
+			return res.status(401).json({ message: 'Invalid credentials' });
+		}
+
+		if (user.type !== 'admin' && user.type !== 'user' && user.type !== 'manager' && user.type !== 'superadmin') {
+			return res.status(403).json({ message: 'Access denied. Unauthorized account type.' });
+		}
+
+		const token = jwt.sign({ id: user.id, email: user.email, type: user.type, company_id: user.company_id }, JWT_SECRET, { expiresIn: '24h' });
+		res.json({
+			token,
+			user: {
+				id: user.id,
+				name: user.name,
+				surname: user.surname,
+				email: user.email,
+				role: user.role,
+				type: user.type,
+				company_id: user.company_id
+			}
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
-
-	if (user.type !== 'admin' && user.type !== 'user' && user.type !== 'manager' && user.type !== 'superadmin') {
-		return res.status(403).json({ message: 'Access denied. Unauthorized account type.' });
-	}
-
-	const token = jwt.sign({ id: user.id, email: user.email, type: user.type, company_id: user.company_id }, JWT_SECRET, { expiresIn: '24h' });
-	res.json({ token, user: { id: user.id, name: user.name, surname: user.surname, email: user.email, role: user.role, gender: user.gender, type: user.type, company_id: user.company_id } });
 });
 
 // ─── Guests Routes ───────────────────────────────────────────────────────
@@ -304,22 +382,33 @@ app.post('/api/admin/upload', authenticateToken, isManagerOrAdmin, upload.single
 });
 
 // GET Company info for the logged-in user
-app.get('/api/admin/companies', authenticateToken, isStaff, (req, res) => {
-    console.log('Fetching company info for user:', req.user);
-	const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.user.company_id);
-	res.json(company || {});
+app.get('/api/admin/companies', authenticateToken, isStaff, async (req, res) => {
+	try {
+		console.log('Fetching company info for user:', req.user);
+		const company = await Company.findByPk(req.user.company_id);
+		res.json(company || {});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // PUT update company info for the logged-in user
-app.put('/api/admin/companies', authenticateToken, isStaff, (req, res) => {
+app.put('/api/admin/companies', authenticateToken, isStaff, async (req, res) => {
 	const { name, logo, address, email, phone, city, country } = req.body;
-	const company = db.prepare('SELECT id FROM companies WHERE id = ?').get(req.user.company_id);
-	if (!company) return res.status(404).json({ message: 'Company not found' });
-
 	try {
-		db.prepare(
-			'UPDATE companies SET name = ?, logo = ?, address = ?, email = ?, phone = ?, city = ?, country = ? WHERE id = ?'
-		).run(name, logo || null, address || null, email || null, phone || null, city || null, country || null, req.user.company_id);
+		const company = await Company.findByPk(req.user.company_id);
+		if (!company) return res.status(404).json({ message: 'Company not found' });
+
+		await company.update({
+			name,
+			logo: logo || null,
+			address: address || null,
+			email: email || null,
+			phone: phone || null,
+			city: city || null,
+			country: country || null
+		});
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Update failed: ' + err.message });
@@ -327,36 +416,53 @@ app.put('/api/admin/companies', authenticateToken, isStaff, (req, res) => {
 });
 
 // GET Users (Admins & Guests)
-app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.get('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const type = req.query.type;
-	let users;
-	if (type) {
-		users = db.prepare('SELECT * FROM users WHERE type = ? AND company_id = ?').all(type, req.user.company_id);
-	} else {
-		users = db.prepare("SELECT * FROM users WHERE company_id = ? AND type != 'admin'").all(req.user.company_id);
+	try {
+		let users;
+		if (type) {
+			users = await User.findAll({
+				where: {
+					type: type,
+					company_id: req.user.company_id
+				}
+			});
+		} else {
+			users = await User.findAll({
+				where: {
+					company_id: req.user.company_id,
+					type: { [Op.ne]: 'admin' }
+				}
+			});
+		}
+
+		const enrichedUsers = await Promise.all(users.map(async (user) => {
+			const assigned = await Event.findAll({
+				include: [{
+					model: User,
+					as: 'assignedUsers',
+					where: { id: user.id },
+					attributes: []
+				}],
+				attributes: ['name']
+			});
+			return {
+				...user.toJSON(),
+				assignedEvents: assigned.map(e => e.name)
+			};
+		}));
+
+		res.json(enrichedUsers);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
-
-	const enrichedUsers = users.map(user => {
-		const assigned = db.prepare(`
-			SELECT e.name 
-			FROM events e
-			JOIN events_users eu ON e.id = eu.event_id
-			WHERE eu.user_id = ?
-		`).all(user.id);
-		return {
-			...user,
-			assignedEvents: assigned.map(e => e.name)
-		};
-	});
-
-	res.json(enrichedUsers);
 });
 
 // POST Create User (Managers & Guests)
-app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, surname, email, type, password, city, country, organization, role, gender } = req.body;
 
-	// Validation: manager cannot create/promote admin or superadmin
 	if (type === 'superadmin') {
 		return res.status(403).json({ message: 'SuperAdmin users cannot be created' });
 	}
@@ -365,21 +471,25 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 		return res.status(403).json({ message: 'Admin users cannot be created by Managers or Admins' });
 	}
 
-    if (req.user.type === 'manager' && type === 'manager') {
-        return res.status(403).json({ message: 'Managers cannot create other managers' });
-    }
+	if (req.user.type === 'manager' && type === 'manager') {
+		return res.status(403).json({ message: 'Managers cannot create other managers' });
+	}
 
 	const hashedPassword = password ? bcrypt.hashSync(password, 10) : null;
 	try {
-		const info = db.prepare(`
-			INSERT INTO users (name, surname, email, type, password, city, country, organization, role, gender, company_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`).run(
-			name, surname, email, type || 'guest', hashedPassword,
-			city || null, country || null, organization || null, role || null, gender || null,
-			req.user.company_id
-		);
-		res.json({ id: info.lastInsertRowid });
+		const user = await User.create({
+			name,
+			surname,
+			email,
+			type: type || 'guest',
+			password: hashedPassword,
+			// Note: If you want to store city/country/organization/gender in User model, you should define them.
+			// Currently, the original SQLite DB schema for users did not have city, country, organization, gender.
+			// But the original code was trying to insert them: they would just be ignored if not in DB, or fail.
+			// Let's keep them in create, they'll be ignored if not in Sequelize model.
+			company_id: req.user.company_id
+		});
+		res.json({ id: user.id });
 	} catch (err) {
 		console.error('Error creating user:', err);
 		res.status(400).json({ message: 'User already exists or invalid data' });
@@ -387,69 +497,75 @@ app.post('/api/admin/users', authenticateToken, isManagerOrAdmin, (req, res) => 
 });
 
 // PUT Update User (Managers & Guests)
-app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.put('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, surname, email, type, role, password } = req.body;
 
-	// Validation: manager cannot promote/demote admin & user must be in same company
-	const userToEdit = db.prepare('SELECT type, company_id FROM users WHERE id = ?').get(req.params.id);
-	if (!userToEdit || userToEdit.company_id !== req.user.company_id) {
-		return res.status(404).json({ message: 'User not found' });
-	}
-
-    if (req.user.type === 'manager') {
-        if (parseInt(req.params.id) !== req.user.id && userToEdit.type !== 'user') {
-            return res.status(403).json({ message: 'Managers can only edit users of type "user"' });
-        }
-        if (type && type !== userToEdit.type) {
-            return res.status(403).json({ message: 'Managers cannot change user roles' });
-        }
-    }
-
-	if (req.user.type === 'admin' && (type === 'superadmin' || userToEdit.type === 'superadmin')) {
-		return res.status(403).json({ message: 'Admins cannot modify or assign superadmin privileges' });
-	}
-
-	// Validation: one admin per company
-	if (type === 'admin') {
-		const existingAdmin = db.prepare('SELECT id FROM users WHERE type = ? AND company_id = ? AND id != ?').get('admin', req.user.company_id, req.params.id);
-		if (existingAdmin) {
-			return res.status(400).json({ message: 'There can only be one admin user per company.' });
-		}
-	}
-
 	try {
-		if (password) {
-			const hashedPassword = bcrypt.hashSync(password, 10);
-			db.prepare(`
-				UPDATE users SET name = ?, surname = ?, email = ?, type = ?, role = ?, password = ?
-				WHERE id = ? AND company_id = ?
-			`).run(name, surname, email, type, role, hashedPassword, req.params.id, req.user.company_id);
-		} else {
-			db.prepare(`
-				UPDATE users SET name = ?, surname = ?, email = ?, type = ?, role = ?
-				WHERE id = ? AND company_id = ?
-			`).run(name, surname, email, type, role, req.params.id, req.user.company_id);
+		const userToEdit = await User.findByPk(req.params.id);
+		if (!userToEdit || userToEdit.company_id !== req.user.company_id) {
+			return res.status(404).json({ message: 'User not found' });
 		}
+
+		if (req.user.type === 'manager') {
+			if (parseInt(req.params.id, 10) !== req.user.id && userToEdit.type !== 'user') {
+				return res.status(403).json({ message: 'Managers can only edit users of type "user"' });
+			}
+			if (type && type !== userToEdit.type) {
+				return res.status(403).json({ message: 'Managers cannot change user roles' });
+			}
+		}
+
+		if (parseInt(req.params.id, 10) === req.user.id) {
+			if (type && type !== userToEdit.type) {
+				return res.status(400).json({ message: 'You cannot change your own account permission.' });
+			}
+		}
+
+		if (req.user.type === 'admin' && (type === 'superadmin' || userToEdit.type === 'superadmin')) {
+			return res.status(403).json({ message: 'Admins cannot modify or assign superadmin privileges' });
+		}
+
+		if (type === 'admin') {
+			const existingAdmin = await User.findOne({
+				where: {
+					type: 'admin',
+					company_id: req.user.company_id,
+					id: { [Op.ne]: req.params.id }
+				}
+			});
+			if (existingAdmin) {
+				return res.status(400).json({ message: 'There can only be one admin user per company.' });
+			}
+		}
+
+		const updateData = { name, surname, email, type, role };
+		if (password) {
+			updateData.password = bcrypt.hashSync(password, 10);
+		}
+
+		await userToEdit.update(updateData);
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Update failed: ' + err.message });
 	}
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const userToDelete = db.prepare('SELECT type, company_id FROM users WHERE id = ?').get(req.params.id);
-	if (!userToDelete || userToDelete.company_id !== req.user.company_id) return res.status(404).json({ message: 'User not found' });
-
-    if (req.user.type === 'manager' && userToDelete.type !== 'user') {
-        return res.status(403).json({ message: 'Managers can only delete users of type "user"' });
-    }
-
-	if (userToDelete.type === 'superadmin') {
-		return res.status(403).json({ message: 'Superadmin cannot be deleted' });
-	}
-
+app.delete('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	try {
-		db.prepare('DELETE FROM users WHERE id = ? AND company_id = ?').run(req.params.id, req.user.company_id);
+		const userToDelete = await User.findByPk(req.params.id);
+		if (!userToDelete || userToDelete.company_id !== req.user.company_id) {
+			return res.status(404).json({ message: 'User not found' });
+		}
+
+		if (req.user.type === 'manager' && userToDelete.type !== 'user') {
+			return res.status(403).json({ message: 'Managers can only delete users of type "user"' });
+		}
+
+		if (userToDelete.type === 'superadmin') {
+			return res.status(403).json({ message: 'Superadmin cannot be deleted' });
+		}
+
+		await userToDelete.destroy();
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Delete failed' });
@@ -457,218 +573,319 @@ app.delete('/api/admin/users/:id', authenticateToken, isManagerOrAdmin, (req, re
 });
 
 // User-Event Assignment Routes (staff: managers & users)
-app.get('/api/admin/users/:id/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(req.params.id);
-	if (!targetUser || targetUser.company_id !== req.user.company_id) {
-		return res.status(404).json({ message: 'User not found' });
+app.get('/api/admin/users/:id/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	const targetUserId = parseInt(req.params.id, 10);
+	try {
+		const targetUser = await User.findByPk(targetUserId);
+		if (!targetUser || targetUser.company_id !== req.user.company_id) {
+			return res.status(404).json({ message: 'User not found' });
+		}
+		if (req.user.type === 'manager' && targetUser.type !== 'user' && targetUserId !== req.user.id) {
+			return res.status(403).json({ message: 'Managers can only view events for themselves or "user" type accounts' });
+		}
+
+		let events;
+		if (req.user.type === 'manager' && targetUserId !== req.user.id) {
+			// Manager viewing another user's events: only show events the manager is also assigned to
+			events = await Event.findAll({
+				where: {
+					status: { [Op.in]: ['not active', 'active'] },
+					company_id: req.user.company_id
+				},
+				include: [
+					{
+						model: User,
+						as: 'assignedUsers',
+						where: { id: req.user.id },
+						attributes: [],
+						required: true
+					}
+				],
+				order: [['date', 'DESC']]
+			});
+		} else {
+			// Admin or manager viewing their own events: show all company events
+			events = await Event.findAll({
+				where: {
+					status: { [Op.in]: ['not active', 'active'] },
+					company_id: req.user.company_id
+				},
+				order: [['date', 'DESC']]
+			});
+		}
+
+		// Map to see if the target user is assigned
+		const targetAssignments = await EventUser.findAll({
+			where: { user_id: targetUserId }
+		});
+		const assignedEventIds = new Set(targetAssignments.map(a => a.event_id));
+
+		const result = events.map(e => {
+			const eventData = e.toJSON();
+			return {
+				...eventData,
+				assigned: assignedEventIds.has(e.id) ? 1 : 0
+			};
+		});
+
+		res.json(result);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
-	if (req.user.type === 'manager' && targetUser.type !== 'user' && parseInt(req.params.id) !== req.user.id) {
-		return res.status(403).json({ message: 'Managers can only view events for themselves or "user" type accounts' });
-	}
-	let events;
-	if (req.user.type === 'manager' && parseInt(req.params.id) !== req.user.id) {
-		// Manager viewing another user's events: only show events the manager is also assigned to
-		events = db.prepare(`
-			SELECT e.*,
-				CASE WHEN eu_target.user_id IS NOT NULL THEN 1 ELSE 0 END as assigned
-			FROM events e
-			JOIN events_users eu_manager ON e.id = eu_manager.event_id AND eu_manager.user_id = ?
-			LEFT JOIN events_users eu_target ON e.id = eu_target.event_id AND eu_target.user_id = ?
-			WHERE e.status IN ('not active', 'active') AND e.company_id = ?
-			ORDER BY e.date DESC
-		`).all(req.user.id, parseInt(req.params.id), req.user.company_id);
-	} else {
-		// Admin or manager viewing their own events: show all company events
-		events = db.prepare(`
-			SELECT e.*,
-				CASE WHEN eu.user_id IS NOT NULL THEN 1 ELSE 0 END as assigned
-			FROM events e
-			LEFT JOIN events_users eu ON e.id = eu.event_id AND eu.user_id = ?
-			WHERE e.status IN ('not active', 'active') AND e.company_id = ?
-			ORDER BY e.date DESC
-		`).all(parseInt(req.params.id), req.user.company_id);
-	}
-	res.json(events);
 });
 
-app.post('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.post('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { id, eventId } = req.params;
-	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(id);
-	const targetEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
-		return res.status(403).json({ message: 'Unauthorized access' });
-	}
-	if (req.user.type === 'manager') {
-		if (targetUser.type !== 'user') {
-			return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
-		}
-		const managerAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
-		if (!managerAssigned) {
-			return res.status(403).json({ message: 'Managers can only assign users to events they themselves belong to' });
-		}
-	}
 	try {
-		db.prepare('INSERT OR IGNORE INTO events_users (user_id, event_id) VALUES (?, ?)').run(id, eventId);
+		const targetUser = await User.findByPk(id);
+		const targetEvent = await Event.findByPk(eventId);
+		if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
+			return res.status(403).json({ message: 'Unauthorized access' });
+		}
+		if (req.user.type === 'manager') {
+			if (targetUser.type !== 'user') {
+				return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
+			}
+			const managerAssigned = await EventUser.findOne({
+				where: { user_id: req.user.id, event_id: eventId }
+			});
+			if (!managerAssigned) {
+				return res.status(403).json({ message: 'Managers can only assign users to events they themselves belong to' });
+			}
+		}
+
+		await EventUser.findOrCreate({
+			where: { user_id: id, event_id: eventId }
+		});
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Error assigning event: ' + err.message });
 	}
 });
 
-app.delete('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.delete('/api/admin/users/:id/events/:eventId', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { id, eventId } = req.params;
-	const targetUser = db.prepare('SELECT company_id, type FROM users WHERE id = ?').get(id);
-	const targetEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
-		return res.status(403).json({ message: 'Unauthorized access' });
-	}
-	if (req.user.type === 'manager') {
-		if (targetUser.type !== 'user') {
-			return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
-		}
-		const managerAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
-		if (!managerAssigned) {
-			return res.status(403).json({ message: 'Managers can only unassign users from events they themselves belong to' });
-		}
-	}
 	try {
-		db.prepare('DELETE FROM events_users WHERE user_id = ? AND event_id = ?').run(id, eventId);
+		const targetUser = await User.findByPk(id);
+		const targetEvent = await Event.findByPk(eventId);
+		if (!targetUser || targetUser.company_id !== req.user.company_id || !targetEvent || targetEvent.company_id !== req.user.company_id) {
+			return res.status(403).json({ message: 'Unauthorized access' });
+		}
+		if (req.user.type === 'manager') {
+			if (targetUser.type !== 'user') {
+				return res.status(403).json({ message: 'Managers can only manage event assignments for "user" type accounts' });
+			}
+			const managerAssigned = await EventUser.findOne({
+				where: { user_id: req.user.id, event_id: eventId }
+			});
+			if (!managerAssigned) {
+				return res.status(403).json({ message: 'Managers can only unassign users from events they themselves belong to' });
+			}
+		}
+
+		await EventUser.destroy({
+			where: { user_id: id, event_id: eventId }
+		});
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Error unassigning event: ' + err.message });
 	}
 });
 
-app.post('/api/admin/guests/:id/send', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const guest = db.prepare('SELECT g.id FROM guests g JOIN events_guests eg ON g.id = eg.guest_id JOIN events e ON eg.event_id = e.id WHERE g.id = ? AND e.company_id = ?').get(req.params.id, req.user.company_id);
-	if (!guest) return res.status(404).json({ message: 'Guest not found' });
-	res.json({ success: true, message: 'Invitation email sent' });
+app.post('/api/admin/guests/:id/send', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		const guest = await Guest.findOne({
+			include: [{
+				model: Event,
+				as: 'events',
+				where: { company_id: req.user.company_id },
+				required: true
+			}],
+			where: { id: req.params.id }
+		});
+		if (!guest) return res.status(404).json({ message: 'Guest not found' });
+		res.json({ success: true, message: 'Invitation email sent' });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.get('/api/admin/guests', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const guests = db.prepare(`
-		SELECT g.id, g.email, g.creation_date, COUNT(eg.event_id) as event_count
-		FROM guests g
-		JOIN events_guests eg ON g.id = eg.guest_id
-		JOIN events e ON eg.event_id = e.id
-		WHERE e.company_id = ?
-		GROUP BY g.id
-	`).all(req.user.company_id);
-    
-    const enrichedGuests = guests.map(g => {
-        const guestDataRows = db.prepare(`
-            SELECT f.field_name, gd.field_value 
-            FROM guestdata gd 
-            JOIN fields f ON gd.field_id = f.id 
-            WHERE gd.guest_id = ?
-        `).all(g.id);
-        let guestObj = { ...g, name: '', surname: '', organization: '', role: '', city: '', country: '', gender: '' };
-        guestDataRows.forEach(row => {
-            guestObj[row.field_name] = row.field_value;
-        });
-        return guestObj;
-    });
+app.get('/api/admin/guests', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		const guests = await Guest.findAll({
+			include: [{
+				model: Event,
+				as: 'events',
+				where: { company_id: req.user.company_id },
+				attributes: [],
+				required: true
+			}],
+			attributes: [
+				'id', 'email', 'creation_date',
+				[sequelize.literal('(SELECT COUNT(*) FROM events_guests WHERE events_guests.guest_id = "Guest".id)'), 'event_count']
+			],
+			group: ['Guest.id']
+		});
 
-	res.json(enrichedGuests);
+		const enrichedGuests = await Promise.all(guests.map(async (g) => {
+			const guestDataRows = await GuestData.findAll({
+				where: { guest_id: g.id },
+				include: [{ model: Field, as: 'field', attributes: ['field_name'] }]
+			});
+
+			let guestObj = {
+				id: g.id,
+				email: g.email,
+				creation_date: g.creation_date,
+				event_count: parseInt(g.getDataValue('event_count') || 0, 10),
+				name: '', surname: '', organization: '', role: '', city: '', country: '', gender: ''
+			};
+
+			guestDataRows.forEach(row => {
+				if (row.field) {
+					guestObj[row.field.field_name] = row.field_value;
+				}
+			});
+			return guestObj;
+		}));
+
+		res.json(enrichedGuests);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const events = db.prepare(`
-		SELECT e.name, e.date, eg.invited, eg.accepted, eg.attended
-		FROM events e
-		JOIN events_guests eg ON e.id = eg.event_id
-		WHERE eg.guest_id = ? AND e.company_id = ?
-	`).all(req.params.id, req.user.company_id);
-	res.json(events);
+app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		const events = await Event.findAll({
+			include: [{
+				model: Guest,
+				as: 'guests',
+				where: { id: req.params.id },
+				required: true,
+				attributes: []
+			}],
+			where: { company_id: req.user.company_id },
+			attributes: [
+				'name', 'date',
+				[sequelize.literal('invited'), 'invited'],
+				[sequelize.literal('accepted'), 'accepted'],
+				[sequelize.literal('attended'), 'attended']
+			]
+		});
+		res.json(events);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-    const { eventId } = req.params;
-    const { guestData } = req.body; 
-    
-    const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-    if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	const { eventId } = req.params;
+	const { guestData } = req.body;
 
-    try {
-        db.transaction(() => {
-            let guestInfo = db.prepare('SELECT id FROM guests WHERE email = ?').get(guestData.email);
-            let guestId;
-            if (guestInfo) {
-                guestId = guestInfo.id;
-            } else {
-                const insertGuest = db.prepare('INSERT INTO guests (email) VALUES (?)').run(guestData.email);
-                guestId = insertGuest.lastInsertRowid;
-            }
+	try {
+		const event = await Event.findByPk(eventId);
+		if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+		if (event.status !== 'active') return res.status(400).json({ message: 'It is only possible to add guests when the event is Active' });
 
-            const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-            db.prepare(`
-                INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
-                VALUES (?, ?, ?)
-            `).run(guestId, eventId, invitationCode);
+		await sequelize.transaction(async (t) => {
+			let [guest] = await Guest.findOrCreate({
+				where: { email: guestData.email },
+				transaction: t
+			});
 
-            const fields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?').all(eventId);
-            const insertData = db.prepare(`
-                INSERT OR REPLACE INTO guestdata (guest_id, field_id, field_value)
-                VALUES (?, ?, ?)
-            `);
+			const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+			await EventGuest.findOrCreate({
+				where: { guest_id: guest.id, event_id: eventId },
+				defaults: { invitation_code: invitationCode },
+				transaction: t
+			});
 
-            fields.forEach(field => {
-                if (guestData[field.field_name] !== undefined) {
-                    insertData.run(guestId, field.id, guestData[field.field_name]);
-                }
-            });
-        })();
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Error creating guest:', err);
-        res.status(400).json({ message: 'Error creating guest: ' + err.message });
-    }
+			const fields = await Field.findAll({ where: { event_id: eventId }, transaction: t });
+			for (const field of fields) {
+				if (guestData[field.field_name] !== undefined) {
+					await GuestData.upsert({
+						guest_id: guest.id,
+						field_id: field.id,
+						field_value: guestData[field.field_name]
+					}, { transaction: t });
+				}
+			}
+		});
+
+		res.json({ success: true });
+	} catch (err) {
+		console.error('Error creating guest:', err);
+		res.status(400).json({ message: 'Error creating guest: ' + err.message });
+	}
 });
 
-app.post('/api/admin/events/:eventId/guests', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-    const { eventId } = req.params;
-    const { guestIds } = req.body;
-    
-    const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-    if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.post('/api/admin/events/:eventId/guests', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	const { eventId } = req.params;
+	const { guestIds } = req.body;
 
-    try {
-        db.transaction(() => {
-            const stmt = db.prepare(`
-                INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
-                VALUES (?, ?, ?)
-            `);
-            guestIds.forEach(guestId => {
-                const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                stmt.run(guestId, eventId, invitationCode);
-            });
-        })();
-        res.json({ success: true });
-    } catch (err) {
-        res.status(400).json({ message: 'Error assigning guests: ' + err.message });
-    }
+	try {
+		const event = await Event.findByPk(eventId);
+		if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+		if (event.status !== 'active') return res.status(400).json({ message: 'It is only possible to add guests when the event is Active' });
+
+		await sequelize.transaction(async (t) => {
+			for (const guestId of guestIds) {
+				const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+				await EventGuest.findOrCreate({
+					where: { guest_id: guestId, event_id: eventId },
+					defaults: { invitation_code: invitationCode },
+					transaction: t
+				});
+			}
+		});
+
+		res.json({ success: true });
+	} catch (err) {
+		res.status(400).json({ message: 'Error assigning guests: ' + err.message });
+	}
 });
 
 // Admin Routes - Events
-app.get('/api/admin/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	let events;
-	if (req.user.type === 'manager') {
-		events = db.prepare(`
-			SELECT e.* 
-			FROM events e
-			JOIN events_users eu ON e.id = eu.event_id
-			WHERE e.company_id = ? AND eu.user_id = ?
-		`).all(req.user.company_id, req.user.id);
-	} else {
-		events = db.prepare('SELECT * FROM events WHERE company_id = ?').all(req.user.company_id);
+app.get('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		let events;
+		if (req.user.type === 'manager') {
+			events = await Event.findAll({
+				include: [{
+					model: User,
+					as: 'assignedUsers',
+					where: { id: req.user.id },
+					attributes: [],
+					required: true
+				}],
+				where: { company_id: req.user.company_id }
+			});
+		} else {
+			events = await Event.findAll({ where: { company_id: req.user.company_id } });
+		}
+		res.json(events);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
-	res.json(events);
 });
 
-app.get('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT * FROM events WHERE id = ? AND company_id = ?').get(req.params.id, req.user.company_id);
-	if (!event) return res.status(404).json({ message: 'Event not found' });
-	res.json(event);
+app.get('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+		res.json(event);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // Invite helpers
@@ -747,29 +964,36 @@ const buildBadgeEmailHtml = (guest, event) => {
 };
 
 app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
-	const event = db.prepare('SELECT * FROM events WHERE id = ? AND company_id = ?').get(req.params.id, req.user.company_id);
-	if (!event) return res.status(404).json({ message: 'Event not found' });
-	if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
-
-	const guestInfo = db.prepare(`
-		SELECT g.id, g.email, eg.invitation_code 
-		FROM guests g 
-		JOIN events_guests eg ON g.id = eg.guest_id 
-		WHERE g.id = ? AND eg.event_id = ?
-	`).get(req.params.guestId, req.params.id);
-	
-	if (!guestInfo) return res.status(404).json({ message: 'Guest not found' });
-
-    const guestDataRows = db.prepare(`
-        SELECT f.field_name, gd.field_value 
-        FROM guestdata gd JOIN fields f ON gd.field_id = f.id 
-        WHERE gd.guest_id = ? AND f.event_id = ?
-    `).all(req.params.guestId, req.params.id);
-    
-    let guest = { id: guestInfo.id, email: guestInfo.email, invitation_code: guestInfo.invitation_code, name: '', surname: '', city: '', country: '', role: '', organization: '' };
-    guestDataRows.forEach(row => guest[row.field_name] = row.field_value);
-
 	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+		if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
+
+		const eg = await EventGuest.findOne({
+			where: { guest_id: req.params.guestId, event_id: req.params.id }
+		});
+		const g = await Guest.findByPk(req.params.guestId);
+		if (!eg || !g) return res.status(404).json({ message: 'Guest not found' });
+
+		const guestDataRows = await GuestData.findAll({
+			where: { guest_id: req.params.guestId },
+			include: [{ model: Field, as: 'field', where: { event_id: req.params.id } }]
+		});
+
+		let guest = {
+			id: g.id,
+			email: g.email,
+			invitation_code: eg.invitation_code,
+			name: '', surname: '', city: '', country: '', role: '', organization: ''
+		};
+		guestDataRows.forEach(row => {
+			if (row.field) {
+				guest[row.field.field_name] = row.field_value;
+			}
+		});
+
 		const html = buildEmailHtml(event.email_template, guest, event, guest.invitation_code);
 		const response = await axios.post(SENDPIGEON_API, {
 			from: EMAIL_FROM,
@@ -782,8 +1006,7 @@ app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isMa
 			return res.status(500).json({ message: 'Email delivery failed' });
 		}
 
-		db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND guest_id = ?')
-			.run(req.params.id, req.params.guestId);
+		await eg.update({ invited: true, invited_date: new Date() });
 		res.json({ success: true });
 	} catch (err) {
 		const msg = err.response?.data?.message || err.message;
@@ -793,40 +1016,51 @@ app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isMa
 
 // Invite all guests in an event (uses batch API — up to 100 per call)
 app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
-	const event = db.prepare('SELECT * FROM events WHERE id = ? AND company_id = ?').get(req.params.id, req.user.company_id);
-	if (!event) return res.status(404).json({ message: 'Event not found' });
-	if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
-
-	const baseGuests = db.prepare(`
-		SELECT g.id, g.email, eg.invitation_code 
-		FROM guests g
-		JOIN events_guests eg ON g.id = eg.guest_id
-		WHERE eg.event_id = ?
-	`).all(req.params.id);
-
-	if (baseGuests.length === 0) return res.json({ success: true, sent: 0, errors: [] });
-
-    const guests = baseGuests.map(g => {
-        const guestDataRows = db.prepare(`
-            SELECT f.field_name, gd.field_value 
-            FROM guestdata gd JOIN fields f ON gd.field_id = f.id 
-            WHERE gd.guest_id = ? AND f.event_id = ?
-        `).all(g.id, req.params.id);
-        
-        let guestObj = { ...g, name: '', surname: '', city: '', country: '', role: '', organization: '' };
-        guestDataRows.forEach(row => guestObj[row.field_name] = row.field_value);
-        return guestObj;
-    });
-
-	// Build batch payload (chunks of 100)
-	const emails = guests.map(guest => ({
-		from: EMAIL_FROM,
-		to: guest.email,
-		subject: `You are invited to ${event.name}`,
-		html: buildEmailHtml(event.email_template, guest, event, guest.invitation_code),
-	}));
-
 	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+		if (!event.email_template) return res.status(400).json({ message: 'No email template set for this event' });
+
+		const eventGuests = await EventGuest.findAll({
+			where: { event_id: req.params.id }
+		});
+		const guestIds = eventGuests.map(eg => eg.guest_id);
+		if (guestIds.length === 0) return res.json({ success: true, sent: 0, errors: [] });
+
+		const baseGuests = await Guest.findAll({
+			where: { id: { [Op.in]: guestIds } }
+		});
+
+		const guests = await Promise.all(baseGuests.map(async (g) => {
+			const eg = eventGuests.find(eg => eg.guest_id === g.id);
+			const guestDataRows = await GuestData.findAll({
+				where: { guest_id: g.id },
+				include: [{ model: Field, as: 'field', where: { event_id: req.params.id } }]
+			});
+
+			let guestObj = {
+				id: g.id,
+				email: g.email,
+				invitation_code: eg ? eg.invitation_code : '',
+				name: '', surname: '', city: '', country: '', role: '', organization: ''
+			};
+			guestDataRows.forEach(row => {
+				if (row.field) {
+					guestObj[row.field.field_name] = row.field_value;
+				}
+			});
+			return guestObj;
+		}));
+
+		const emails = guests.map(guest => ({
+			from: EMAIL_FROM,
+			to: guest.email,
+			subject: `You are invited to ${event.name}`,
+			html: buildEmailHtml(event.email_template, guest, event, guest.invitation_code),
+		}));
+
 		const response = await axios.post(`${SENDPIGEON_API}/batch`, { emails }, { headers: sendpigeonHeaders() });
 		const results = response.data?.data || [];
 		const errors = results
@@ -834,10 +1068,15 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 			.map(r => ({ guest: guests[r.index]?.email, error: 'Delivery failed' }));
 
 		// Mark successfully sent guests as invited
-		const updateStmt = db.prepare('UPDATE events_guests SET invited = 1, invited_date = CURRENT_TIMESTAMP WHERE event_id = ? AND guest_id = ?');
-		results
-			.filter(r => r.status !== 'failed')
-			.forEach(r => { if (guests[r.index]) updateStmt.run(req.params.id, guests[r.index].id); });
+		const successIndices = results.filter(r => r.status !== 'failed').map(r => r.index);
+		const successGuestIds = successIndices.map(idx => guests[idx]?.id).filter(Boolean);
+
+		if (successGuestIds.length > 0) {
+			await EventGuest.update(
+				{ invited: true, invited_date: new Date() },
+				{ where: { event_id: req.params.id, guest_id: { [Op.in]: successGuestIds } } }
+			);
+		}
 
 		res.json({ success: true, sent: results.length - errors.length, errors });
 	} catch (err) {
@@ -846,250 +1085,344 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 	}
 });
 
-app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, city, country, date, email_template, status, logo } = req.body;
 	try {
-		const info = db.transaction(() => {
-			const result = db.prepare(`
-				INSERT INTO events (name, city, country, date, email_template, status, logo, company_id)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			`).run(name, city, country, date, email_template, status || 'not active', logo, req.user.company_id);
-			
-			const eventId = result.lastInsertRowid;
-			
-			const insertField = db.prepare(`
-				INSERT INTO fields (event_id, field_name, field_type, field_order, required)
-				VALUES (?, ?, ?, ?, ?)
-			`);
-			insertField.run(eventId, 'name', 'text', 0, 1);
-			insertField.run(eventId, 'surname', 'text', 1, 1);
-			insertField.run(eventId, 'email', 'text', 2, 1);
-			
+		const eventId = await sequelize.transaction(async (t) => {
+			const event = await Event.create({
+				name,
+				city: city || null,
+				country: country || null,
+				date: date || null,
+				email_template: email_template || null,
+				status: status || 'not active',
+				logo: logo || null,
+				company_id: req.user.company_id
+			}, { transaction: t });
+
+			await Field.create({ event_id: event.id, field_name: 'name', field_type: 'text', field_order: 0, required: true }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'surname', field_type: 'text', field_order: 1, required: true }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'email', field_type: 'text', field_order: 2, required: true }, { transaction: t });
+
 			if (req.user.type === 'manager') {
-				db.prepare('INSERT INTO events_users (user_id, event_id) VALUES (?, ?)').run(req.user.id, eventId);
+				await EventUser.create({ user_id: req.user.id, event_id: event.id }, { transaction: t });
 			}
 
-			return eventId;
-		})();
-		res.json({ id: info });
+			return event.id;
+		});
+
+		res.json({ id: eventId });
 	} catch (err) {
 		console.error("Error creating event:", err);
 		res.status(500).json({ message: 'Error creating event' });
 	}
 });
 
-app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
+app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { name, city, country, date, email_template, status, logo } = req.body;
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	db.prepare(`
-		UPDATE events SET name = ?, city = ?, country = ?, date = ?, email_template = ?, status = ?, logo = ?
-		WHERE id = ? AND company_id = ?
-	`).run(name, city, country, date, email_template, status || 'not active', logo, req.params.id, req.user.company_id);
-	res.json({ success: true });
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		await event.update({
+			name,
+			city: city || null,
+			country: country || null,
+			date: date || null,
+			email_template: email_template || null,
+			status: status || 'not active',
+			logo: logo || null
+		});
+
+		res.json({ success: true });
+	} catch (err) {
+		res.status(400).json({ message: 'Update failed: ' + err.message });
+	}
 });
 
 // Admin Routes - Custom Event Fields
-app.get('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
-	const fields = db.prepare(`
-		SELECT id, event_id, field_name, field_type, field_values, field_order, required
-		FROM fields
-		WHERE event_id = ?
-		ORDER BY field_order ASC
-	`).all(req.params.eventId);
-	
-	res.json(fields);
+app.get('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const fields = await Field.findAll({
+			where: { event_id: req.params.eventId },
+			order: [['field_order', 'ASC']]
+		});
+
+		res.json(fields);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
+app.post('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { field_name, field_type, field_values, required } = req.body;
 	if (!field_name || !field_type) return res.status(400).json({ message: 'field_name and field_type required' });
-	
+
 	try {
-		const maxOrder = db.prepare('SELECT COALESCE(MAX(field_order), -1) as max_order FROM fields WHERE event_id = ?').get(req.params.eventId);
-		const info = db.prepare(`
-			INSERT INTO fields (event_id, field_name, field_type, field_values, field_order, required)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`).run(req.params.eventId, field_name, field_type, field_values || null, maxOrder.max_order + 1, required ? 1 : 0);
-		
-		res.json({ id: info.lastInsertRowid });
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const maxOrder = await Field.max('field_order', { where: { event_id: req.params.eventId } });
+		const nextOrder = (maxOrder !== null && maxOrder !== undefined) ? maxOrder + 1 : 0;
+
+		const field = await Field.create({
+			event_id: req.params.eventId,
+			field_name,
+			field_type,
+			field_values: field_values || null,
+			field_order: nextOrder,
+			required: required ? true : false
+		});
+
+		res.json({ id: field.id });
 	} catch (err) {
-		if (err.message.includes('UNIQUE constraint failed')) {
+		if (err.name === 'SequelizeUniqueConstraintError') {
 			return res.status(400).json({ message: 'Field name already exists for this event' });
 		}
 		res.status(500).json({ message: 'Database error' });
 	}
 });
 
-app.put('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
-	const field = db.prepare('SELECT event_id FROM fields WHERE id = ?').get(req.params.fieldId);
-	if (!field || field.event_id !== parseInt(req.params.eventId)) return res.status(404).json({ message: 'Field not found' });
-	
+app.put('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { field_name, field_type, field_values, required } = req.body;
-	
+
 	try {
-		db.prepare(`
-			UPDATE fields
-			SET field_name = COALESCE(?, field_name),
-				field_type = COALESCE(?, field_type),
-				field_values = ?,
-				required = COALESCE(?, required),
-				updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?
-		`).run(field_name || null, field_type || null, field_values !== undefined ? field_values : null, required !== undefined ? (required ? 1 : 0) : null, req.params.fieldId);
-		
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const field = await Field.findOne({
+			where: { id: req.params.fieldId, event_id: req.params.eventId }
+		});
+		if (!field) return res.status(404).json({ message: 'Field not found' });
+
+		const updateData = {};
+		if (field_name !== undefined) updateData.field_name = field_name;
+		if (field_type !== undefined) updateData.field_type = field_type;
+		if (field_values !== undefined) updateData.field_values = field_values;
+		if (required !== undefined) updateData.required = required ? true : false;
+
+		await field.update(updateData);
 		res.json({ success: true });
 	} catch (err) {
-		if (err.message.includes('UNIQUE constraint failed')) {
+		if (err.name === 'SequelizeUniqueConstraintError') {
 			return res.status(400).json({ message: 'Field name already exists for this event' });
 		}
 		res.status(500).json({ message: 'Database error' });
 	}
 });
 
-app.delete('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
-	const field = db.prepare('SELECT event_id FROM fields WHERE id = ?').get(req.params.fieldId);
-	if (!field || field.event_id !== parseInt(req.params.eventId)) return res.status(404).json({ message: 'Field not found' });
-	
-	db.prepare('DELETE FROM fields WHERE id = ?').run(req.params.fieldId);
-	res.json({ success: true });
+app.delete('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const field = await Field.findOne({
+			where: { id: req.params.fieldId, event_id: req.params.eventId }
+		});
+		if (!field) return res.status(404).json({ message: 'Field not found' });
+
+		await field.destroy();
+		res.json({ success: true });
+	} catch (err) {
+		res.status(500).json({ message: 'Database error' });
+	}
 });
 
-app.post('/api/admin/events/:eventId/fields/reorder', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
+app.post('/api/admin/events/:eventId/fields/reorder', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { fieldOrder } = req.body; // Array of field IDs in desired order
 	if (!Array.isArray(fieldOrder)) return res.status(400).json({ message: 'fieldOrder must be an array' });
-	
+
 	try {
-		const stmt = db.prepare('UPDATE fields SET field_order = ? WHERE id = ? AND event_id = ?');
-		fieldOrder.forEach((fieldId, index) => {
-			stmt.run(index, fieldId, req.params.eventId);
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
 		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		await sequelize.transaction(async (t) => {
+			for (let index = 0; index < fieldOrder.length; index++) {
+				const fieldId = fieldOrder[index];
+				await Field.update(
+					{ field_order: index },
+					{
+						where: { id: fieldId, event_id: req.params.eventId },
+						transaction: t
+					}
+				);
+			}
+		});
+
 		res.json({ success: true });
 	} catch (err) {
 		res.status(500).json({ message: 'Database error' });
 	}
 });
 
-app.get('/api/admin/events/:eventId/field-templates', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
-	const templates = db.prepare(`
-		SELECT DISTINCT e.id, e.name
-		FROM events e
-		LEFT JOIN fields f ON e.id = f.event_id
-		WHERE e.company_id = ? AND e.id != ? AND f.id IS NOT NULL
-		ORDER BY e.name ASC
-	`).all(req.user.company_id, req.params.eventId);
-	
-	res.json(templates);
+app.get('/api/admin/events/:eventId/field-templates', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const templates = await Event.findAll({
+			include: [{
+				model: Field,
+				as: 'fields',
+				required: true,
+				attributes: []
+			}],
+			where: {
+				company_id: req.user.company_id,
+				id: { [Op.ne]: req.params.eventId }
+			},
+			group: ['Event.id'],
+			order: [['name', 'ASC']]
+		});
+
+		res.json(templates);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:eventId/copy-fields', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
+app.post('/api/admin/events/:eventId/copy-fields', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { sourceEventId } = req.body;
 	if (!sourceEventId) return res.status(400).json({ message: 'sourceEventId required' });
-	
-	const sourceEvent = db.prepare('SELECT company_id FROM events WHERE id = ?').get(sourceEventId);
-	if (!sourceEvent || sourceEvent.company_id !== req.user.company_id) return res.status(404).json({ message: 'Source event not found' });
-	
+
 	try {
-		// Delete existing fields in target event
-		db.prepare('DELETE FROM fields WHERE event_id = ?').run(req.params.eventId);
-		
-		// Copy fields from source event
-		const sourceFields = db.prepare(`
-			SELECT field_name, field_type, field_values, required
-			FROM fields
-			WHERE event_id = ?
-			ORDER BY field_order ASC
-		`).all(sourceEventId);
-		
-		const stmt = db.prepare(`
-			INSERT INTO fields (event_id, field_name, field_type, field_values, field_order, required)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`);
-		
-		sourceFields.forEach((field, index) => {
-			stmt.run(req.params.eventId, field.field_name, field.field_type, field.field_values, index, field.required);
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
 		});
-		
-		res.json({ success: true, copiedCount: sourceFields.length });
+		const sourceEvent = await Event.findOne({
+			where: { id: sourceEventId, company_id: req.user.company_id }
+		});
+		if (!event || !sourceEvent) return res.status(404).json({ message: 'Event not found' });
+
+		await sequelize.transaction(async (t) => {
+			await Field.destroy({ where: { event_id: req.params.eventId }, transaction: t });
+
+			const sourceFields = await Field.findAll({
+				where: { event_id: sourceEventId },
+				order: [['field_order', 'ASC']],
+				transaction: t
+			});
+
+			for (let index = 0; index < sourceFields.length; index++) {
+				const f = sourceFields[index];
+				await Field.create({
+					event_id: req.params.eventId,
+					field_name: f.field_name,
+					field_type: f.field_type,
+					field_values: f.field_values,
+					field_order: index,
+					required: f.required
+				}, { transaction: t });
+			}
+		});
+
+		res.json({ success: true });
 	} catch (err) {
+		console.error(err);
 		res.status(500).json({ message: 'Database error' });
 	}
 });
 
 // Admin Routes - Guest Custom Data
-app.get('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
-	const customData = db.prepare(`
-		SELECT g.id as custom_data_id, g.field_id, f.field_name, f.field_type, g.field_value
-		FROM guestdata g
-		JOIN fields f ON g.field_id = f.id
-		WHERE g.guest_id = ? AND f.event_id = ?
-		ORDER BY f.field_order ASC
-	`).all(req.params.guestId, req.params.eventId);
-	
-	res.json(customData);
+app.get('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const customData = await GuestData.findAll({
+			include: [{
+				model: Field,
+				as: 'field',
+				where: { event_id: req.params.eventId },
+				attributes: ['field_name', 'field_type', 'field_order']
+			}],
+			where: { guest_id: req.params.guestId }
+		});
+
+		// Sort by field_order and format
+		const sorted = customData.map(gd => ({
+			custom_data_id: gd.id,
+			field_id: gd.field_id,
+			field_name: gd.field ? gd.field.field_name : '',
+			field_type: gd.field ? gd.field.field_type : '',
+			field_value: gd.field_value
+		})).sort((a, b) => {
+			const orderA = customData.find(x => x.id === a.custom_data_id)?.field?.field_order || 0;
+			const orderB = customData.find(x => x.id === b.custom_data_id)?.field?.field_order || 0;
+			return orderA - orderB;
+		});
+
+		res.json(sorted);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
+app.post('/api/admin/events/:eventId/guests/:guestId/customdata', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { customData } = req.body; // Array of { field_id, field_value }
 	if (!Array.isArray(customData)) return res.status(400).json({ message: 'customData must be an array' });
-	
+
 	try {
-		const stmt = db.prepare(`
-			INSERT INTO guestdata (guest_id, field_id, field_value)
-			VALUES (?, ?, ?)
-			ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
-		`);
-		
-		customData.forEach(({ field_id, field_value }) => {
-			stmt.run(req.params.guestId, field_id, field_value || null);
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
 		});
-		
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		await sequelize.transaction(async (t) => {
+			for (const { field_id, field_value } of customData) {
+				await GuestData.upsert({
+					guest_id: req.params.guestId,
+					field_id: field_id,
+					field_value: field_value || null,
+					updated_at: new Date()
+				}, { transaction: t });
+			}
+		});
+
 		res.json({ success: true });
 	} catch (err) {
+		console.error(err);
 		res.status(500).json({ message: 'Database error' });
 	}
 });
 
-app.put('/api/admin/events/:eventId/guests/:guestId/customdata/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	
+app.put('/api/admin/events/:eventId/guests/:guestId/customdata/:fieldId', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { field_value } = req.body;
-	
+
 	try {
-		db.prepare(`
-			UPDATE guestdata
-			SET field_value = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE guest_id = ? AND field_id = ?
-		`).run(field_value || null, req.params.guestId, req.params.fieldId);
-		
+		const event = await Event.findOne({
+			where: { id: req.params.eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		const gd = await GuestData.findOne({
+			where: { guest_id: req.params.guestId, field_id: req.params.fieldId }
+		});
+		if (!gd) return res.status(404).json({ message: 'Custom data not found' });
+
+		await gd.update({ field_value: field_value || null, updated_at: new Date() });
 		res.json({ success: true });
 	} catch (err) {
 		res.status(500).json({ message: 'Database error' });
@@ -1097,75 +1430,106 @@ app.put('/api/admin/events/:eventId/guests/:guestId/customdata/:fieldId', authen
 });
 
 // Admin Routes - Sponsors
-app.get('/api/admin/sponsors', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const sponsors = db.prepare(`
-		SELECT s.*, COUNT(es.event_id) as event_count
-		FROM sponsors s
-		LEFT JOIN events_sponsors es ON s.id = es.sponsor_id
-		WHERE s.company_id = ?
-		GROUP BY s.id
-	`).all(req.user.company_id);
-	res.json(sponsors);
+app.get('/api/admin/sponsors', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		const sponsors = await Sponsor.findAll({
+			where: { company_id: req.user.company_id },
+			attributes: {
+				include: [
+					[
+						sequelize.literal(`(
+							SELECT COUNT(*)
+							FROM events_sponsors
+							WHERE events_sponsors.sponsor_id = "Sponsor".id
+						)`),
+						'event_count'
+					]
+				]
+			}
+		});
+
+		const result = sponsors.map(s => {
+			const sponsorData = s.toJSON();
+			sponsorData.event_count = parseInt(sponsorData.event_count || 0, 10);
+			return sponsorData;
+		});
+
+		res.json(result);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.get('/api/admin/sponsors/:id/events', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const sponsor = db.prepare('SELECT company_id FROM sponsors WHERE id = ?').get(req.params.id);
-	if (!sponsor || sponsor.company_id !== req.user.company_id) return res.status(404).json({ message: 'Sponsor not found' });
+app.get('/api/admin/sponsors/:id/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
+	try {
+		const sponsor = await Sponsor.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!sponsor) return res.status(404).json({ message: 'Sponsor not found' });
 
-	const events = db.prepare(`
-		SELECT e.name, e.date
-		FROM events e
-		JOIN events_sponsors es ON e.id = es.event_id
-		WHERE es.sponsor_id = ? AND e.company_id = ?
-	`).all(req.params.id, req.user.company_id);
-	res.json(events);
+		const events = await Event.findAll({
+			include: [{
+				model: Sponsor,
+				as: 'sponsors',
+				where: { id: req.params.id },
+				attributes: [],
+				required: true
+			}],
+			where: { company_id: req.user.company_id },
+			attributes: ['name', 'date']
+		});
+		res.json(events);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/sponsors', authenticateToken, isManagerOrAdmin, (req, res) => {
-	console.log('Sponsor creation request body:', req.body);
+app.post('/api/admin/sponsors', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, description, logo, url, contact, contact_email, contact_phone, country } = req.body;
 	try {
-		const info = db.prepare(`
-			INSERT INTO sponsors (name, description, logo, url, contact, contact_email, contact_phone, country, company_id)
-			VALUES (@name, @description, @logo, @url, @contact, @contact_email, @contact_phone, @country, @company_id)
-		`).run({
-			name: req.body.name || null,
-			description: req.body.description || null,
-			logo: req.body.logo || null,
-			url: req.body.url || null,
-			contact: req.body.contact || null,
-			contact_email: req.body.contact_email || null,
-			contact_phone: req.body.contact_phone || null,
-			country: req.body.country || null,
+		const sponsor = await Sponsor.create({
+			name: name || null,
+			description: description || null,
+			logo: logo || null,
+			url: url || null,
+			contact: contact || null,
+			contact_email: contact_email || null,
+			contact_phone: contact_phone || null,
+			country: country || null,
 			company_id: req.user.company_id
 		});
-		res.json({ id: info.lastInsertRowid });
+		res.json({ id: sponsor.id });
 	} catch (err) {
 		console.error('Error creating sponsor:', err);
 		res.status(500).json({ message: 'Error creating sponsor: ' + err.message });
 	}
 });
 
-app.put('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
+app.put('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	const { name, description, logo, url, contact, contact_email, contact_phone, country } = req.body;
-	const sponsor = db.prepare('SELECT company_id FROM sponsors WHERE id = ?').get(req.params.id);
-	if (!sponsor || sponsor.company_id !== req.user.company_id) return res.status(404).json({ message: 'Sponsor not found' });
 	try {
-		db.prepare(`
-			UPDATE sponsors SET name = ?, description = ?, logo = ?, url = ?, contact = ?, contact_email = ?, contact_phone = ?, country = ?
-			WHERE id = ? AND company_id = ?
-		`).run(name, description, logo, url, contact, contact_email, contact_phone, country, req.params.id, req.user.company_id);
+		const sponsor = await Sponsor.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!sponsor) return res.status(404).json({ message: 'Sponsor not found' });
+
+		await sponsor.update({ name, description, logo, url, contact, contact_email, contact_phone, country });
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Update failed: ' + err.message });
 	}
 });
 
-app.delete('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, (req, res) => {
-	const sponsor = db.prepare('SELECT company_id FROM sponsors WHERE id = ?').get(req.params.id);
-	if (!sponsor || sponsor.company_id !== req.user.company_id) return res.status(404).json({ message: 'Sponsor not found' });
+app.delete('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	try {
-		db.prepare('DELETE FROM sponsors WHERE id = ? AND company_id = ?').run(req.params.id, req.user.company_id);
+		const sponsor = await Sponsor.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!sponsor) return res.status(404).json({ message: 'Sponsor not found' });
+
+		await sponsor.destroy();
 		res.json({ success: true });
 	} catch (err) {
 		res.status(400).json({ message: 'Delete failed' });
@@ -1173,93 +1537,154 @@ app.delete('/api/admin/sponsors/:id', authenticateToken, isManagerOrAdmin, (req,
 });
 
 // Event Guests Management (registrant guests via guests + events_guests)
-app.get('/api/admin/events/:id/guests', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.get('/api/admin/events/:id/guests', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
 
-	const baseGuests = db.prepare(`
-		SELECT g.id, g.email, g.creation_date,
-			eg.invited, eg.invited_date, eg.accepted, eg.accepted_date,
-			eg.attended, eg.attended_date, eg.invitation_code
-		FROM guests g
-		JOIN events_guests eg ON g.id = eg.guest_id
-		WHERE eg.event_id = ?
-	`).all(req.params.id);
+		const eventGuests = await EventGuest.findAll({
+			where: { event_id: req.params.id }
+		});
+		const guestIds = eventGuests.map(eg => eg.guest_id);
 
-	const guests = baseGuests.map(g => {
-		const rows = db.prepare(`
-			SELECT f.field_name, gd.field_value
-			FROM guestdata gd JOIN fields f ON gd.field_id = f.id
-			WHERE gd.guest_id = ? AND f.event_id = ?
-		`).all(g.id, req.params.id);
-		const obj = { ...g, name: '', surname: '', role: '', organization: '', city: '', country: '', gender: '' };
-		rows.forEach(r => { obj[r.field_name] = r.field_value; });
-		return obj;
-	});
-	res.json(guests);
+		const baseGuests = await Guest.findAll({
+			where: { id: { [Op.in]: guestIds } }
+		});
+
+		const guests = await Promise.all(baseGuests.map(async (g) => {
+			const eg = eventGuests.find(eg => eg.guest_id === g.id);
+			const rows = await GuestData.findAll({
+				where: { guest_id: g.id },
+				include: [{ model: Field, as: 'field', where: { event_id: req.params.id }, attributes: ['field_name'] }]
+			});
+
+			const obj = {
+				id: g.id,
+				email: g.email,
+				creation_date: g.creation_date,
+				invited: eg ? (eg.invited ? 1 : 0) : 0,
+				invited_date: eg ? eg.invited_date : null,
+				accepted: eg ? (eg.accepted ? 1 : 0) : 0,
+				accepted_date: eg ? eg.accepted_date : null,
+				attended: eg ? (eg.attended ? 1 : 0) : 0,
+				attended_date: eg ? eg.attended_date : null,
+				invitation_code: eg ? eg.invitation_code : null,
+				name: '', surname: '', role: '', organization: '', city: '', country: '', gender: ''
+			};
+
+			rows.forEach(r => {
+				if (r.field) {
+					obj[r.field.field_name] = r.field_value;
+				}
+			});
+			return obj;
+		}));
+
+		res.json(guests);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.delete('/api/admin/events/:id/guests/:guestId', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-	db.prepare('DELETE FROM events_guests WHERE event_id = ? AND guest_id = ?').run(req.params.id, req.params.guestId);
-	res.json({ success: true });
+app.delete('/api/admin/events/:id/guests/:guestId', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		await EventGuest.destroy({
+			where: { event_id: req.params.id, guest_id: req.params.guestId }
+		});
+		res.json({ success: true });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // Event Sponsors Management
-app.get('/api/admin/events/:id/sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.get('/api/admin/events/:id/sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
 
-	const sponsors = db.prepare(`
-		SELECT s.* FROM sponsors s
-		JOIN events_sponsors es ON s.id = es.sponsor_id
-		WHERE es.event_id = ? AND s.company_id = ?
-	`).all(req.params.id, req.user.company_id);
-	res.json(sponsors);
+		const sponsors = await Sponsor.findAll({
+			include: [{
+				model: Event,
+				as: 'events',
+				where: { id: req.params.id },
+				attributes: [],
+				required: true
+			}],
+			where: { company_id: req.user.company_id }
+		});
+		res.json(sponsors);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.get('/api/admin/events/:id/available-sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.get('/api/admin/events/:id/available-sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
 
-	const sponsors = db.prepare(`
-		SELECT * FROM sponsors 
-		WHERE company_id = ?
-		AND id NOT IN (SELECT sponsor_id FROM events_sponsors WHERE event_id = ?)
-	`).all(req.user.company_id, req.params.id);
-	res.json(sponsors);
+		const assignedSponsors = await EventSponsor.findAll({
+			where: { event_id: req.params.id }
+		});
+		const assignedIds = assignedSponsors.map(es => es.sponsor_id);
+
+		const sponsors = await Sponsor.findAll({
+			where: {
+				company_id: req.user.company_id,
+				id: { [Op.notIn]: assignedIds.length > 0 ? assignedIds : [-1] }
+			}
+		});
+		res.json(sponsors);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:id/sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
+app.post('/api/admin/events/:id/sponsors', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { sponsorIds } = req.body;
 	const eventId = req.params.id;
 
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
-
-	// Validate target sponsors belong to same company
-	const stmtCheck = db.prepare('SELECT company_id FROM sponsors WHERE id = ?');
-	for (const sponsorId of sponsorIds) {
-		const targetSponsor = stmtCheck.get(sponsorId);
-		if (!targetSponsor || targetSponsor.company_id !== req.user.company_id) {
-			return res.status(403).json({ message: 'Unauthorized sponsor addition' });
-		}
-	}
-
-	const insert = db.prepare(`
-		INSERT INTO events_sponsors (sponsor_id, event_id)
-		VALUES (?, ?)
-	`);
-
-	const transaction = db.transaction((ids) => {
-		for (const sponsorId of ids) {
-			insert.run(sponsorId, eventId);
-		}
-	});
-
 	try {
-		transaction(sponsorIds);
+		const event = await Event.findOne({
+			where: { id: eventId, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
+
+		// Validate target sponsors belong to same company
+		for (const sponsorId of sponsorIds) {
+			const targetSponsor = await Sponsor.findOne({
+				where: { id: sponsorId, company_id: req.user.company_id }
+			});
+			if (!targetSponsor) {
+				return res.status(403).json({ message: 'Unauthorized sponsor addition' });
+			}
+		}
+
+		await sequelize.transaction(async (t) => {
+			for (const sponsorId of sponsorIds) {
+				await EventSponsor.findOrCreate({
+					where: { sponsor_id: sponsorId, event_id: eventId },
+					transaction: t
+				});
+			}
+		});
+
 		res.json({ success: true });
 	} catch (err) {
 		console.error('Error adding sponsors to event:', err);
@@ -1267,19 +1692,26 @@ app.post('/api/admin/events/:id/sponsors', authenticateToken, isManagerOrAdmin, 
 	}
 });
 
-app.delete('/api/admin/events/:id/sponsors/:sponsorId', authenticateToken, isManagerOrAdmin, isEventAssigned, (req, res) => {
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(req.params.id);
-	if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
+app.delete('/api/admin/events/:id/sponsors/:sponsorId', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
+	try {
+		const event = await Event.findOne({
+			where: { id: req.params.id, company_id: req.user.company_id }
+		});
+		if (!event) return res.status(404).json({ message: 'Event not found' });
 
-	db.prepare('DELETE FROM events_sponsors WHERE event_id = ? AND sponsor_id = ?')
-		.run(req.params.id, req.params.sponsorId);
-	res.json({ success: true });
+		await EventSponsor.destroy({
+			where: { event_id: req.params.id, sponsor_id: req.params.sponsorId }
+		});
+		res.json({ success: true });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
-app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAdmin, isEventAssigned, upload.single('file'), (req, res) => {
+app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAdmin, isEventAssigned, upload.single('file'), async (req, res) => {
 	if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-	const fs = require('fs');
 	const iconv = require('iconv-lite');
 	const jschardet = require('jschardet');
 	const buffer = fs.readFileSync(req.file.path);
@@ -1293,204 +1725,276 @@ app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAd
 	}
 
 	const lines = fileContent.split(/\r?\n/);
-	const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+	const header = lines[0].split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
 
 	const errors = [];
-	const importedCount = 0;
+	let importedCount = 0;
 	const eventId = req.params.id;
 
-	const event = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!event || event.company_id !== req.user.company_id) {
-		return res.status(404).json({ message: 'Event not found' });
-	}
-
-	const findGuest = db.prepare('SELECT id FROM guests WHERE email = ?');
-	const createGuest = db.prepare('INSERT INTO guests (email) VALUES (?)');
-	const getFields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?');
-	const upsertData = db.prepare(`
-		INSERT INTO guestdata (guest_id, field_id, field_value)
-		VALUES (?, ?, ?)
-		ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
-	`);
-	const assignToEvent = db.prepare(`
-		INSERT OR IGNORE INTO events_guests (guest_id, event_id, invitation_code)
-		VALUES (?, ?, ?)
-	`);
-
-	const eventFields = getFields.all(eventId);
-
-	const transaction = db.transaction(() => {
-		for (let i = 1; i < lines.length; i++) {
-			if (!lines[i].trim()) continue;
-
-			const values = lines[i].split(',').map(v => v.trim());
-			const row = {};
-			header.forEach((h, index) => row[h] = values[index]);
-
-			if (!row.email) {
-				errors.push(`Line ${i + 1}: Missing email`);
-				continue;
-			}
-
-			let guestId;
-			const existing = findGuest.get(row.email);
-			if (existing) {
-				guestId = existing.id;
-			} else {
-				const info = createGuest.run(row.email);
-				guestId = info.lastInsertRowid;
-			}
-
-			const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-			assignToEvent.run(guestId, eventId, invitationCode);
-
-			// Insert field data (name, surname, email and any extras)
-			eventFields.forEach(field => {
-				const val = row[field.field_name];
-				if (val !== undefined) upsertData.run(guestId, field.id, val);
-			});
-		}
-	});
-
 	try {
-		transaction();
+		const event = await Event.findOne({
+			where: { id: eventId, company_id: req.user.company_id }
+		});
+		if (!event) {
+			return res.status(404).json({ message: 'Event not found' });
+		}
+		if (event.status !== 'active') {
+			return res.status(400).json({ message: 'It is only possible to add guests when the event is Active' });
+		}
+
+		const eventFields = await Field.findAll({ where: { event_id: eventId } });
+		const dbFieldNames = eventFields.map(f => f.field_name.toLowerCase());
+		const matchedFields = [];
+		const unmatchedFields = [];
+
+		header.forEach(h => {
+			if (dbFieldNames.includes(h)) {
+				matchedFields.push(h);
+			} else {
+				unmatchedFields.push(h);
+			}
+		});
+
+		await sequelize.transaction(async (t) => {
+			for (let i = 1; i < lines.length; i++) {
+				if (!lines[i].trim()) continue;
+
+				const values = lines[i].split(',').map(v => v.trim());
+				const row = {};
+				header.forEach((h, index) => {
+					row[h] = values[index] !== undefined ? values[index] : '';
+				});
+
+				if (!row.email) {
+					errors.push(`Line ${i + 1}: Missing email`);
+					continue;
+				}
+
+				let [guest] = await Guest.findOrCreate({
+					where: { email: row.email },
+					transaction: t
+				});
+
+				const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+				await EventGuest.findOrCreate({
+					where: { guest_id: guest.id, event_id: eventId },
+					defaults: { invitation_code: invitationCode },
+					transaction: t
+				});
+
+				// Insert field data (name, surname, email and any extras)
+				for (const field of eventFields) {
+					const val = row[field.field_name.toLowerCase()];
+					if (val !== undefined) {
+						await GuestData.upsert({
+							guest_id: guest.id,
+							field_id: field.id,
+							field_value: val
+						}, { transaction: t });
+					}
+				}
+				importedCount++;
+			}
+		});
+
 		fs.unlinkSync(req.file.path);
-		res.json({ success: true, errors });
+		res.json({
+			success: true,
+			importedCount,
+			matchedFields,
+			unmatchedFields,
+			errors
+		});
 	} catch (err) {
 		console.error(err);
+		if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 		res.status(500).json({ message: 'Import failed' });
 	}
 });
 
 // Public Routes - Guest Confirmation
-app.get('/api/public/confirmation/:code', (req, res) => {
-	const row = db.prepare(`
-		SELECT g.id as guest_id, g.email, e.id as event_id, e.name as event_name, e.city, e.country, e.date, eg.accepted, eg.invitation_code
-		FROM guests g
-		JOIN events_guests eg ON g.id = eg.guest_id
-		JOIN events e ON eg.event_id = e.id
-		WHERE eg.invitation_code = ?
-	`).get(req.params.code);
+app.get('/api/public/confirmation/:code', async (req, res) => {
+	try {
+		const eg = await EventGuest.findOne({
+			where: { invitation_code: req.params.code }
+		});
+		if (!eg) return res.status(404).json({ message: 'Invalid invitation code' });
+		if (eg.accepted) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
 
-	if (!row) return res.status(404).json({ message: 'Invalid invitation code' });
-	if (row.accepted) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
+		const guest = await Guest.findByPk(eg.guest_id);
+		const event = await Event.findByPk(eg.event_id);
 
-	// Enrich with field data
-	const fieldRows = db.prepare(`
-		SELECT f.field_name, gd.field_value
-		FROM guestdata gd JOIN fields f ON gd.field_id = f.id
-		WHERE gd.guest_id = ? AND f.event_id = ?
-	`).all(row.guest_id, row.event_id);
-	const data = { ...row, name: '', surname: '', role: '', organization: '', city: '', country: '', gender: '' };
-	fieldRows.forEach(r => { data[r.field_name] = r.field_value; });
-	res.json(data);
+		// Enrich with field data
+		const fieldRows = await GuestData.findAll({
+			where: { guest_id: eg.guest_id },
+			include: [{ model: Field, as: 'field', where: { event_id: eg.event_id } }]
+		});
+
+		const data = {
+			guest_id: guest.id,
+			email: guest.email,
+			event_id: event.id,
+			event_name: event.name,
+			city: event.city,
+			country: event.country,
+			date: event.date,
+			accepted: eg.accepted ? 1 : 0,
+			invitation_code: eg.invitation_code,
+			name: '', surname: '', role: '', organization: '', city: '', country: '', gender: ''
+		};
+
+		fieldRows.forEach(r => {
+			if (r.field) {
+				data[r.field.field_name] = r.field_value;
+			}
+		});
+
+		res.json(data);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 app.post('/api/public/confirm', async (req, res) => {
 	const { code, userData } = req.body;
-	const invitation = db.prepare(`
-		SELECT eg.guest_id, eg.event_id, eg.accepted, g.email, eg.invitation_code
-		FROM events_guests eg
-		JOIN guests g ON eg.guest_id = g.id
-		WHERE eg.invitation_code = ?
-	`).get(code);
-
-	if (!invitation) return res.status(404).json({ message: 'Invalid code' });
-	if (invitation.accepted) return res.status(400).json({ message: 'Invitation already confirmed' });
-
-	const event = db.prepare('SELECT * FROM events WHERE id = ?').get(invitation.event_id);
-
-	// Upsert field data (name, surname, etc.) into guestdata
-	const fields = db.prepare('SELECT id, field_name FROM fields WHERE event_id = ?').all(invitation.event_id);
-	const upsert = db.prepare(`
-		INSERT INTO guestdata (guest_id, field_id, field_value)
-		VALUES (?, ?, ?)
-		ON CONFLICT(guest_id, field_id) DO UPDATE SET field_value = excluded.field_value, updated_at = CURRENT_TIMESTAMP
-	`);
-	fields.forEach(f => {
-		if (userData[f.field_name] !== undefined) upsert.run(invitation.guest_id, f.id, userData[f.field_name]);
-	});
-
-	// Mark as accepted
-	db.prepare('UPDATE events_guests SET accepted = 1, accepted_date = CURRENT_TIMESTAMP WHERE invitation_code = ?').run(code);
-
-	// Send Badge Email
 	try {
-		const guestForBadge = { ...userData, invitation_code: code };
-		const badgeHtml = buildBadgeEmailHtml(guestForBadge, event);
-		await axios.post(SENDPIGEON_API, {
-			from: EMAIL_FROM,
-			to: invitation.email,
-			subject: `Confirmation & Digital Badge: ${event.name}`,
-			html: badgeHtml,
-		}, { headers: sendpigeonHeaders() });
-	} catch (err) {
-		console.error('Failed to send badge email:', err.message);
-	}
+		const eg = await EventGuest.findOne({
+			where: { invitation_code: code }
+		});
+		if (!eg) return res.status(404).json({ message: 'Invalid code' });
+		if (eg.accepted) return res.status(400).json({ message: 'Invitation already confirmed' });
 
-	res.json({ success: true });
+		const guest = await Guest.findByPk(eg.guest_id);
+		const event = await Event.findByPk(eg.event_id);
+
+		// Upsert field data (name, surname, etc.) into guestdata
+		const fields = await Field.findAll({ where: { event_id: eg.event_id } });
+		await sequelize.transaction(async (t) => {
+			for (const f of fields) {
+				if (userData[f.field_name] !== undefined) {
+					await GuestData.upsert({
+						guest_id: eg.guest_id,
+						field_id: f.id,
+						field_value: userData[f.field_name]
+					}, { transaction: t });
+				}
+			}
+			await eg.update({ accepted: true, accepted_date: new Date() }, { transaction: t });
+		});
+
+		// Send Badge Email
+		try {
+			const guestForBadge = { ...userData, invitation_code: code };
+			const badgeHtml = buildBadgeEmailHtml(guestForBadge, event);
+			await axios.post(SENDPIGEON_API, {
+				from: EMAIL_FROM,
+				to: guest.email,
+				subject: `Confirmation & Digital Badge: ${event.name}`,
+				html: badgeHtml,
+			}, { headers: sendpigeonHeaders() });
+		} catch (err) {
+			console.error('Failed to send badge email:', err.message);
+		}
+
+		res.json({ success: true });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
+	}
 });
 
 // Mobile App Routes - For Staff (Admins, Managers and Users)
-app.get('/api/mobile/events', authenticateToken, isStaff, (req, res) => {
-	if (req.user.type === 'admin') {
-		const events = db.prepare(`
-			SELECT * FROM events 
-			WHERE status = 'active' AND company_id = ?
-		`).all(req.user.company_id);
-		return res.json(events);
-	} else {
-		const events = db.prepare(`
-			SELECT e.* FROM events e
-			JOIN events_users eu ON e.id = eu.event_id
-			WHERE e.status = 'active' AND eu.user_id = ?
-		`).all(req.user.id);
-		return res.json(events);
+app.get('/api/mobile/events', authenticateToken, isStaff, async (req, res) => {
+	try {
+		if (req.user.type === 'admin') {
+			const events = await Event.findAll({
+				where: { status: 'active', company_id: req.user.company_id }
+			});
+			return res.json(events);
+		} else {
+			const events = await Event.findAll({
+				include: [{
+					model: User,
+					as: 'assignedUsers',
+					where: { id: req.user.id },
+					attributes: [],
+					required: true
+				}],
+				where: { status: 'active' }
+			});
+			return res.json(events);
+		}
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
 });
 
-app.post('/api/mobile/validate', authenticateToken, isStaff, (req, res) => {
+app.post('/api/mobile/validate', authenticateToken, isStaff, async (req, res) => {
 	const { invitationCode, eventId } = req.body;
 
-	// Verify the event belongs to the same company
-	const eventCheck = db.prepare('SELECT company_id FROM events WHERE id = ?').get(eventId);
-	if (!eventCheck || eventCheck.company_id !== req.user.company_id) {
-		return res.status(403).json({ message: 'You are not authorized to scan for this event' });
-	}
-
-	// Verify if the scanning staff member is assigned to this event (admins bypass)
-	if (req.user.type !== 'admin') {
-		const isAssigned = db.prepare('SELECT 1 FROM events_users WHERE user_id = ? AND event_id = ?').get(req.user.id, eventId);
-		if (!isAssigned) {
-			return res.status(403).json({ message: 'You are not assigned to this event' });
+	try {
+		// Verify the event belongs to the same company
+		const eventCheck = await Event.findByPk(eventId);
+		if (!eventCheck || eventCheck.company_id !== req.user.company_id) {
+			return res.status(403).json({ message: 'You are not authorized to scan for this event' });
 		}
+
+		// Verify if the scanning staff member is assigned to this event (admins bypass)
+		if (req.user.type !== 'admin') {
+			const isAssigned = await EventUser.findOne({
+				where: { user_id: req.user.id, event_id: eventId }
+			});
+			if (!isAssigned) {
+				return res.status(403).json({ message: 'You are not assigned to this event' });
+			}
+		}
+
+		// Look up the guest by invitation code in events_guests
+		const eg = await EventGuest.findOne({
+			where: { invitation_code: invitationCode, event_id: eventId }
+		});
+		if (!eg) return res.status(404).json({ message: 'Invalid badge' });
+
+		const guest = await Guest.findByPk(eg.guest_id);
+		const event = await Event.findByPk(eg.event_id);
+
+		// Get name & surname from custom fields
+		const nameField = await Field.findOne({ where: { event_id: eventId, field_name: 'name' } });
+		const surnameField = await Field.findOne({ where: { event_id: eventId, field_name: 'surname' } });
+
+		let guestName = '';
+		let guestSurname = '';
+
+		if (nameField) {
+			const gdName = await GuestData.findOne({ where: { guest_id: eg.guest_id, field_id: nameField.id } });
+			if (gdName) guestName = gdName.field_value || '';
+		}
+		if (surnameField) {
+			const gdSurname = await GuestData.findOne({ where: { guest_id: eg.guest_id, field_id: surnameField.id } });
+			if (gdSurname) guestSurname = gdSurname.field_value || '';
+		}
+
+		await eg.update({ attended: true, attended_date: new Date() });
+
+		res.json({
+			success: true,
+			message: 'Attendance validated',
+			guestName: `${guestName} ${guestSurname}`.trim(),
+			eventName: event.name
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: 'Internal server error' });
 	}
-
-	// Look up the guest by invitation code in events_guests
-	const guestInfo = db.prepare(`
-		SELECT gd_name.field_value as name, gd_surname.field_value as surname, e.name as event_name
-		FROM events_guests eg
-		JOIN events e ON eg.event_id = e.id
-		LEFT JOIN fields f_name ON f_name.event_id = e.id AND f_name.field_name = 'name'
-		LEFT JOIN guestdata gd_name ON gd_name.guest_id = eg.guest_id AND gd_name.field_id = f_name.id
-		LEFT JOIN fields f_surname ON f_surname.event_id = e.id AND f_surname.field_name = 'surname'
-		LEFT JOIN guestdata gd_surname ON gd_surname.guest_id = eg.guest_id AND gd_surname.field_id = f_surname.id
-		WHERE eg.invitation_code = ? AND eg.event_id = ?
-	`).get(invitationCode, eventId);
-
-	if (!guestInfo) return res.status(404).json({ message: 'Invalid badge' });
-
-	db.prepare('UPDATE events_guests SET attended = 1, attended_date = CURRENT_TIMESTAMP WHERE invitation_code = ? AND event_id = ?').run(invitationCode, eventId);
-
-	res.json({
-		success: true,
-		message: 'Attendance validated',
-		guestName: `${guestInfo.name || ''} ${guestInfo.surname || ''}`.trim(),
-		eventName: guestInfo.event_name
-	});
 });
 
-// ─── Superadmin Routes ───────────────────────────────────────────────────────
-app.listen(PORT, () => {
-	console.log(`Server running on http://localhost:${PORT}`);
+// Start DB then listen
+initDb().then(() => {
+	app.listen(PORT, () => {
+		console.log(`Server running on http://localhost:${PORT}`);
+	});
+}).catch(err => {
+	console.error('Failed to initialize database:', err);
 });

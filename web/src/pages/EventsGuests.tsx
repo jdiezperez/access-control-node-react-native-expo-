@@ -5,10 +5,11 @@ import {
     ArrowLeft, Plus, Upload, Search, X, Check,
     ChevronUp, ChevronDown, Filter, Loader2, Unlink,
     User, QrCode, Mail, AlertCircle, CheckCircle2,
-    Mails
+    Mails, Edit2
 } from 'lucide-react';
 import type { Guest } from '@/data/Types';
 import AddGuestsModal from '../components/AddGuestModal';
+import GuestModal from '../components/GuestModal';
 import ImportCSVModal from '../components/ImportCSVModal';
 import BadgeModal from '../components/BadgeModal';
 
@@ -55,6 +56,10 @@ const EventsGuests = () => {
 
     // Badge modal
     const [badgeGuest, setBadgeGuest] = useState<Guest | null>(null);
+
+    // Edit guest modal
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [guestToEdit, setGuestToEdit] = useState<Guest | null>(null);
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -224,14 +229,18 @@ const EventsGuests = () => {
 
                     <button
                         onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-2 px-5 py-3 border border-white/10 rounded-2xl hover:text-white hover:bg-white/5 transition-all font-semibold text-slate-400 cursor-pointer"
+                        disabled={event?.status !== 'active'}
+                        title={event?.status !== 'active' ? 'Event must be Active to import guests' : 'Import guests from CSV'}
+                        className="flex items-center gap-2 px-5 py-3 border border-white/10 rounded-2xl hover:text-white hover:bg-white/5 transition-all font-semibold text-slate-400 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     >
                         <Upload size={16} /> Import CSV
                     </button>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-                        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                        disabled={event?.status !== 'active'}
+                        title={event?.status !== 'active' ? 'Event must be Active to add guests' : 'Add guests to this event'}
+                        className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-blue-500/30 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        style={{ background: event?.status === 'active' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#475569' }}
                     >
                         <Plus size={16} /> Add Guests
                     </button>
@@ -365,6 +374,15 @@ const EventsGuests = () => {
                                                             <QrCode size={16} />
                                                         </button>
 
+                                                        {/* Edit */}
+                                                        <button
+                                                            onClick={() => { setGuestToEdit(guest); setShowEditModal(true); }}
+                                                            title="Edit guest fields"
+                                                            className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+
                                                         {/* Remove */}
                                                         <button
                                                             onClick={() => handleRemoveGuest(guest.id)}
@@ -470,6 +488,13 @@ const EventsGuests = () => {
                                                 Badge
                                             </button>
                                             <button
+                                                onClick={() => { setGuestToEdit(guest); setShowEditModal(true); }}
+                                                className="flex-1 max-w-[120px] flex items-center justify-center gap-2 py-2 border border-white/10 rounded-xl hover:text-white hover:bg-white/5 transition-all text-xs font-semibold text-slate-300"
+                                            >
+                                                <Edit2 size={12} />
+                                                Edit
+                                            </button>
+                                            <button
                                                 onClick={() => handleRemoveGuest(guest.id)}
                                                 className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl border border-white/10 transition-all ml-auto"
                                             >
@@ -488,6 +513,14 @@ const EventsGuests = () => {
 
             {showAddModal && <AddGuestsModal onClose={() => setShowAddModal(false)} onAdded={fetchEventGuests} eventId={id!} />}
             {showImportModal && <ImportCSVModal onClose={() => setShowImportModal(false)} onImported={fetchEventGuests} eventId={id!} />}
+
+            <GuestModal
+                isOpen={showEditModal}
+                onClose={() => { setShowEditModal(false); setGuestToEdit(null); }}
+                onSave={fetchEventGuests}
+                guestToEdit={guestToEdit}
+                eventId={id!}
+            />
 
             {/* Badge Modal */}
             {badgeGuest && (

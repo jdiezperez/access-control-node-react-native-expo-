@@ -3,56 +3,75 @@ import { X, User, Mail, Briefcase, Loader2, Save, Upload, MapPin } from 'lucide-
 import axios from 'axios';
 import CountrySelect from '@/components/CountrySelect';
 
+interface Field {
+    id: number;
+    event_id: number;
+    field_name: string;
+    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date';
+    field_values?: string;
+    field_order: number;
+    required: number | boolean;
+}
+
+const defaultFields: Field[] = [
+    { id: -1, event_id: -1, field_name: 'name', field_type: 'text', field_order: 0, required: 1 },
+    { id: -2, event_id: -1, field_name: 'surname', field_type: 'text', field_order: 1, required: 1 },
+    { id: -3, event_id: -1, field_name: 'email', field_type: 'text', field_order: 2, required: 1 },
+    { id: -4, event_id: -1, field_name: 'role', field_type: 'text', field_order: 3, required: 0 },
+    { id: -5, event_id: -1, field_name: 'organization', field_type: 'text', field_order: 4, required: 0 },
+    { id: -6, event_id: -1, field_name: 'city', field_type: 'text', field_order: 5, required: 0 },
+    { id: -7, event_id: -1, field_name: 'country', field_type: 'text', field_order: 6, required: 0 },
+    { id: -8, event_id: -1, field_name: 'gender', field_type: 'options', field_values: 'male|female|non binary|other|prefer not to say', field_order: 7, required: 0 }
+];
+
 interface GuestModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: () => void;
     guestToEdit?: any;
+    eventId?: string | number;
 }
 
-const GuestModal = ({ isOpen, onClose, onSave, guestToEdit }: GuestModalProps) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        surname: '',
-        email: '',
-        role: '',
-        organization: '',
-        city: '',
-        country: '',
-        gender: '',
-        image: ''
-    });
+const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModalProps) => {
+    const [fields, setFields] = useState<Field[]>([]);
+    const [formData, setFormData] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (guestToEdit) {
-            setFormData({
-                name: guestToEdit.name || '',
-                surname: guestToEdit.surname || '',
-                email: guestToEdit.email || '',
-                role: guestToEdit.role || '',
-                organization: guestToEdit.organization || '',
-                city: guestToEdit.city || '',
-                country: guestToEdit.country || '',
-                gender: guestToEdit.gender || '',
-                image: guestToEdit.image || ''
-            });
-        } else {
-            setFormData({
-                name: '',
-                surname: '',
-                email: '',
-                role: '',
-                organization: '',
-                city: '',
-                country: '',
-                gender: '',
-                image: ''
-            });
+        const fetchFields = async () => {
+            if (eventId) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/fields`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setFields(res.data);
+                } catch (err) {
+                    console.error('Failed to fetch event fields', err);
+                    setFields(defaultFields);
+                }
+            } else {
+                setFields(defaultFields);
+            }
+        };
+
+        if (isOpen) {
+            fetchFields();
         }
-    }, [guestToEdit, isOpen]);
+    }, [eventId, isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            const initialData: Record<string, any> = {};
+            fields.forEach(f => {
+                initialData[f.field_name] = guestToEdit ? (guestToEdit[f.field_name] || '') : '';
+            });
+            initialData.image = guestToEdit ? (guestToEdit.image || '') : '';
+            setFormData(initialData);
+        }
+    }, [guestToEdit, fields, isOpen]);
 
     if (!isOpen) return null;
 
@@ -81,27 +100,54 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit }: GuestModalProps) =
         e.preventDefault();
         setError(null);
 
-        if (!formData.name || !formData.surname || !formData.email) {
-            setError('Please fill in all mandatory fields (Name, Surname, Email)');
+        // Validation: find first missing required field
+        const missingRequired = fields.find(f => {
+            const isReq = f.required === 1 || f.required === true;
+            return isReq && !formData[f.field_name];
+        });
+
+        if (missingRequired) {
+            setError(`Please fill in all mandatory fields (${missingRequired.field_name})`);
             return;
         }
 
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const payload = {
-                ...formData,
-                type: 'guest'
-            };
 
-            if (guestToEdit) {
-                await axios.put(`${import.meta.env.VITE_API_URL}/api/admin/users/${guestToEdit.id}`, payload, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+            if (eventId) {
+                if (guestToEdit) {
+                    const customData = fields.map(f => ({
+                        field_id: f.id,
+                        field_value: formData[f.field_name]
+                    }));
+                    await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests/${guestToEdit.id}/customdata`, {
+                        customData
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                } else {
+                    await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/events/${eventId}/guests/create`, {
+                        guestData: formData
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                }
             } else {
-                await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/users`, payload, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const payload = {
+                    ...formData,
+                    type: 'guest'
+                };
+
+                if (guestToEdit) {
+                    await axios.put(`${import.meta.env.VITE_API_URL}/api/admin/users/${guestToEdit.id}`, payload, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                } else {
+                    await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/users`, payload, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                }
             }
             onSave();
             onClose();
@@ -111,6 +157,21 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit }: GuestModalProps) =
             setLoading(false);
         }
     };
+
+    const getFieldLabelIcon = (fieldName: string) => {
+        switch (fieldName) {
+            case 'role':
+            case 'organization':
+                return <Briefcase size={14} />;
+            case 'city':
+            case 'country':
+                return <MapPin size={14} />;
+            default:
+                return null;
+        }
+    };
+
+    const sortedFields = [...fields].sort((a, b) => a.field_order - b.field_order);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -160,104 +221,154 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit }: GuestModalProps) =
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">First Name *</label>
-                            <input
-                                required
-                                type="text"
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Surname *</label>
-                            <input
-                                required
-                                type="text"
-                                value={formData.surname}
-                                onChange={e => setFormData({ ...formData, surname: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                            />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Email Address *</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    required
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                />
-                            </div>
-                        </div>
+                        {sortedFields.map(field => {
+                            const value = formData[field.field_name] || '';
+                            const onChange = (val: any) => setFormData(prev => ({ ...prev, [field.field_name]: val }));
+                            const isRequired = field.required === 1 || field.required === true;
+                            const labelText = `${field.field_name.charAt(0).toUpperCase() + field.field_name.slice(1)}${isRequired ? ' *' : ''}`;
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <Briefcase size={14} /> Role
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.role}
-                                onChange={e => setFormData({ ...formData, role: e.target.value })}
-                                placeholder="e.g. CEO, Developer"
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                            />
-                        </div>
+                            // Custom CountrySelect
+                            if (field.field_name === 'country') {
+                                return (
+                                    <div key={field.id} className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                            {getFieldLabelIcon(field.field_name)}
+                                            {labelText}
+                                        </label>
+                                        <CountrySelect
+                                            value={value}
+                                            onChange={onChange}
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
+                                        />
+                                    </div>
+                                );
+                            }
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <Briefcase size={14} /> Organization
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.organization}
-                                onChange={e => setFormData({ ...formData, organization: e.target.value })}
-                                placeholder="Company Name"
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                            />
-                        </div>
+                            // Custom Email input with icon
+                            if (field.field_name === 'email') {
+                                return (
+                                    <div key={field.id} className="md:col-span-2 space-y-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">{labelText}</label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                            <input
+                                                required={isRequired}
+                                                type="email"
+                                                value={value}
+                                                onChange={e => onChange(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            }
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <MapPin size={14} /> City
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.city}
-                                onChange={e => setFormData({ ...formData, city: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <MapPin size={14} /> Country
-                            </label>
-                            <CountrySelect
-                                value={formData.country}
-                                onChange={v => setFormData({ ...formData, country: v })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Gender</label>
-                            <select
-                                value={formData.gender}
-                                onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
-                            >
-                                <option value="">Select Gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="non binary">Non Binary</option>
-                                <option value="other">Other</option>
-                                <option value="prefer not to say">Prefer not to say</option>
-                            </select>
-                        </div>
+                            switch (field.field_type) {
+                                case 'number':
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                {getFieldLabelIcon(field.field_name)}
+                                                {labelText}
+                                            </label>
+                                            <input
+                                                required={isRequired}
+                                                type="number"
+                                                value={value}
+                                                onChange={e => onChange(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                    );
+                                case 'yes/no':
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">
+                                                {labelText}
+                                            </label>
+                                            <div className="flex gap-6 items-center py-2">
+                                                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name={field.field_name}
+                                                        value="yes"
+                                                        checked={value === 'yes'}
+                                                        onChange={() => onChange('yes')}
+                                                        required={isRequired}
+                                                        className="w-4 h-4 text-primary focus:ring-primary"
+                                                    />
+                                                    Yes
+                                                </label>
+                                                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name={field.field_name}
+                                                        value="no"
+                                                        checked={value === 'no'}
+                                                        onChange={() => onChange('no')}
+                                                        required={isRequired}
+                                                        className="w-4 h-4 text-primary focus:ring-primary"
+                                                    />
+                                                    No
+                                                </label>
+                                            </div>
+                                        </div>
+                                    );
+                                case 'options':
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                {getFieldLabelIcon(field.field_name)}
+                                                {labelText}
+                                            </label>
+                                            <select
+                                                required={isRequired}
+                                                value={value}
+                                                onChange={e => onChange(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
+                                            >
+                                                <option value="">Select option</option>
+                                                {field.field_values?.split('|').map(v => v.trim()).filter(Boolean).map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    );
+                                case 'date':
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                {getFieldLabelIcon(field.field_name)}
+                                                {labelText}
+                                            </label>
+                                            <input
+                                                required={isRequired}
+                                                type="date"
+                                                value={value}
+                                                onChange={e => onChange(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                    );
+                                case 'text':
+                                default:
+                                    return (
+                                        <div key={field.id} className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                {getFieldLabelIcon(field.field_name)}
+                                                {labelText}
+                                            </label>
+                                            <input
+                                                required={isRequired}
+                                                type="text"
+                                                value={value}
+                                                onChange={e => onChange(e.target.value)}
+                                                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                            />
+                                        </div>
+                                    );
+                            }
+                        })}
                     </div>
 
                     <div className="pt-4 flex items-center justify-end border-t border-slate-100 gap-3">

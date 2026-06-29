@@ -47,6 +47,10 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 			return;
 		}
 
+		if (!window.confirm('This action will delete existing fields')) {
+			return;
+		}
+
 		try {
 			setCopying(true);
 			setError(null);
@@ -116,6 +120,12 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 									<span className="font-semibold text-slate-800">{template.name}</span>
 								</label>
 							))}
+						</div>
+					)}
+
+					{selectedId && (
+						<div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm font-semibold">
+							This action will delete existing fields
 						</div>
 					)}
 
