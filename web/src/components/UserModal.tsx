@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, User, Mail, Shield, Briefcase, Eye, EyeOff, Loader2, Save } from 'lucide-react';
 import axios from 'axios';
 
@@ -25,6 +25,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
     const [error, setError] = useState<string | null>(null);
     const [currentUserType, setCurrentUserType] = useState<string>('');
     const [editingProfile, setEditingProfile] = useState<boolean>(false);
+    const formRef = useRef<HTMLFormElement>(null);
 
     useEffect(() => {
         const currentUserStr = localStorage.getItem('user');
@@ -58,6 +59,13 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
             });
         }
     }, [userToEdit, isOpen]);
+
+    // Scroll form to top whenever an error message appears
+    useEffect(() => {
+        if (error && formRef.current) {
+            formRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [error]);
 
     if (!isOpen) return null;
 
@@ -132,7 +140,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                <form ref={formRef} onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
                     {error && (
                         <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-medium flex items-center gap-2">
                             <X size={16} /> {error}
@@ -234,9 +242,8 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                                 disabled={!!((userToEdit && currentUserType === 'manager') || editingProfile)}
                                 className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                {currentUserType === 'admin' && (
-                                    <option value="manager">Manager</option>
-                                )}
+                                <option value="admin">Admin</option>
+                                <option value="manager">Manager</option>
                                 <option value="user">Scanner Staff</option>
                             </select>
                         </div>
@@ -262,7 +269,7 @@ const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserMod
                         </div>
                     </div>
                 </form>
-            </div>
+            </div >
         </div >
     );
 };
