@@ -295,7 +295,10 @@ const UsersManagement = () => {
 
             <UserAssignEventsModal
                 isOpen={!!assignUser}
-                onClose={() => setAssignUser(null)}
+                onClose={() => {
+                    setAssignUser(null)
+                    fetchData()
+                }}
                 user={assignUser}
             />
 
