@@ -31,8 +31,16 @@ const EventEdit = () => {
 	const [deleting, setDeleting] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
 	const state = location.state as { tab?: string } | null;
-	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
-	);
+	//	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
+	const [activeTab, setActiveTab] = useState<'info' | 'fields'>('info');
+
+	useEffect(() => {
+		if (!isNew && location.state?.tab === 'fields') {
+			setActiveTab('fields');
+		} else if (isNew) {
+			setActiveTab('info');
+		}
+	}, [id, isNew, location.state]);
 
 	useEffect(() => {
 		const load = async () => {
