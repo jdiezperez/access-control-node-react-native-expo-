@@ -62,7 +62,6 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 			setError('Field name and type are required');
 			return;
 		}
-
 		if (newField.field_type === 'options' && !newField.field_values) {
 			setError('Please add at least one option value');
 			return;
@@ -272,6 +271,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 
 										<div className="flex gap-2">
 											<button
+												type="button"
 												onClick={() => handleUpdateField(field.id!)}
 												disabled={saving}
 												className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -279,6 +279,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 												{saving ? 'Saving...' : 'Save'}
 											</button>
 											<button
+												type="button"
 												onClick={() => setEditingId(null)}
 												className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-semibold transition-colors"
 											>
@@ -305,12 +306,14 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 								{editingId !== field.id && (
 									<div className="flex gap-2 shrink-0">
 										<button
+											type="button"
 											onClick={() => setEditingId(field.id!)}
 											className="px-3 py-1 rounded-lg border border-white/10 text-white hover:bg-white/10 text-xs font-semibold transition-colors"
 										>
 											Edit
 										</button>
 										<button
+											type="button"
 											onClick={() => handleDeleteField(field.id!)}
 											disabled={saving}
 											className="p-1 text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
@@ -359,6 +362,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 
 						<div className="flex gap-2">
 							<button
+								type="button"
 								onClick={handleAddField}
 								disabled={saving}
 								className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -366,6 +370,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 								{saving ? 'Adding...' : 'Add Field'}
 							</button>
 							<button
+								type="button"
 								onClick={() => {
 									setShowAddForm(false);
 									setError(null);
@@ -378,6 +383,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 					</div>
 				) : (
 					<button
+						type="button"
 						onClick={() => setShowAddForm(true)}
 						className="w-full px-4 py-3 rounded-lg border border-dashed border-white/30 bg-white/5 hover:bg-white/10 text-white transition-colors flex items-center justify-center gap-2"
 					>
