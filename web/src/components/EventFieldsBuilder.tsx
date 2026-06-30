@@ -256,8 +256,8 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 										<FieldTypeSelector
 											fieldType={field.field_type}
 											fieldValues={field.field_values}
-											onTypeChange={(type) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_type: type } : f)))}}
-											onValuesChange={(values) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_values: values } : f)))}}
+											onTypeChange={(type) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_type: type } : f))) }}
+											onValuesChange={(values) => { setFields(prev => (prev.map(f => f.id === field.id ? { ...f, field_values: values } : f))) }}
 										/>
 
 										<label className="flex items-center gap-2 text-white cursor-pointer">
@@ -289,10 +289,10 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 								) : (
 									// View Mode
 									<div className="flex-1">
-										<div className="font-semibold text-white text-sm">{field.field_name}</div>
+										<div className="font-semibold text-white text-sm capitalize">{field.field_name}</div>
 										<div className="text-xs text-slate-400 mt-1">
 											Type: <span className="text-slate-300">{field.field_type}</span>
-											{field.required ? (<span className="ml-3 text-blue-400">• Required</span>): null}
+											{field.required ? (<span className="ml-3 text-blue-400">• Required</span>) : null}
 										</div>
 										{field.field_type === 'options' && field.field_values && (
 											<div className="text-xs text-slate-400 mt-2">
@@ -326,65 +326,67 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 			</div>
 
 			{/* Add New Field Form */}
-			{showAddForm ? (
-				<div className="p-4 rounded-lg border border-white/10 bg-white/5 space-y-4">
-					<h4 className="font-semibold text-white">Add New Field</h4>
+			{
+				showAddForm ? (
+					<div className="p-4 rounded-lg border border-white/10 bg-white/5 space-y-4">
+						<h4 className="font-semibold text-white">Add New Field</h4>
 
-					<input
-						type="text"
-						value={newField.field_name}
-						onChange={(e) => setNewField({ ...newField, field_name: e.target.value })}
-						placeholder="Field name"
-						className="w-full px-3 py-2 rounded-lg border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 text-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-						style={{ background: 'rgba(255,255,255,0.03)' }}
-					/>
-
-					<FieldTypeSelector
-						fieldType={newField.field_type}
-						fieldValues={newField.field_values}
-						onTypeChange={(type) => { setNewField(prev => ({ ...prev, field_type: type })); }}
-						onValuesChange={(values) => { setNewField(prev => ({ ...prev, field_values: values })); }}
-					/>
-
-					<label className="flex items-center gap-2 text-white cursor-pointer">
 						<input
-							type="checkbox"
-							checked={newField.required || false}
-							onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
-							className="rounded"
+							type="text"
+							value={newField.field_name}
+							onChange={(e) => setNewField({ ...newField, field_name: e.target.value })}
+							placeholder="Field name"
+							className="w-full px-3 py-2 rounded-lg border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 text-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+							style={{ background: 'rgba(255,255,255,0.03)' }}
 						/>
-						<span className="text-sm font-medium">Required field</span>
-					</label>
 
-					<div className="flex gap-2">
-						<button
-							onClick={handleAddField}
-							disabled={saving}
-							className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
-						>
-							{saving ? 'Adding...' : 'Add Field'}
-						</button>
-						<button
-							onClick={() => {
-								setShowAddForm(false);
-								setError(null);
-							}}
-							className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-semibold transition-colors"
-						>
-							Cancel
-						</button>
+						<FieldTypeSelector
+							fieldType={newField.field_type}
+							fieldValues={newField.field_values}
+							onTypeChange={(type) => { setNewField(prev => ({ ...prev, field_type: type })); }}
+							onValuesChange={(values) => { setNewField(prev => ({ ...prev, field_values: values })); }}
+						/>
+
+						<label className="flex items-center gap-2 text-white cursor-pointer">
+							<input
+								type="checkbox"
+								checked={newField.required || false}
+								onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
+								className="rounded"
+							/>
+							<span className="text-sm font-medium">Required field</span>
+						</label>
+
+						<div className="flex gap-2">
+							<button
+								onClick={handleAddField}
+								disabled={saving}
+								className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+							>
+								{saving ? 'Adding...' : 'Add Field'}
+							</button>
+							<button
+								onClick={() => {
+									setShowAddForm(false);
+									setError(null);
+								}}
+								className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-semibold transition-colors"
+							>
+								Cancel
+							</button>
+						</div>
 					</div>
-				</div>
-			) : (
-				<button
-					onClick={() => setShowAddForm(true)}
-					className="w-full px-4 py-3 rounded-lg border border-dashed border-white/30 bg-white/5 hover:bg-white/10 text-white transition-colors flex items-center justify-center gap-2"
-				>
-					<Plus size={18} />
-					<span className="font-semibold text-sm">Add Custom Field</span>
-				</button>
-			)}
-		</div>
+				) : (
+					<button
+						onClick={() => setShowAddForm(true)}
+						className="w-full px-4 py-3 rounded-lg border border-dashed border-white/30 bg-white/5 hover:bg-white/10 text-white transition-colors flex items-center justify-center gap-2"
+					>
+						<Plus size={18} />
+						<span className="font-semibold text-sm">Add Custom Field</span>
+					</button>
+				)
+			}
+		</div >
 	);
 };
 

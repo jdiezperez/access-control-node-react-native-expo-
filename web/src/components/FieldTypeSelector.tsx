@@ -8,11 +8,11 @@ interface FieldTypeSelectorProps {
 	onValuesChange: (values: string) => void;
 }
 
-const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({ 
-	fieldType, 
-	fieldValues, 
-	onTypeChange, 
-	onValuesChange 
+const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
+	fieldType,
+	fieldValues,
+	onTypeChange,
+	onValuesChange
 }) => {
 	const [options, setOptions] = useState<string[]>(
 		fieldValues ? fieldValues.split('|').filter(v => v.trim()) : []
@@ -43,7 +43,7 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 	};
 
 	const handleTypeChange = (newType: string) => {
-        onTypeChange(newType);
+		onTypeChange(newType);
 		if (newType !== 'options') {
 			setOptions([]);
 			onValuesChange('');
@@ -91,7 +91,7 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 					<label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">
 						Option Values
 					</label>
-					
+
 					{/* Option List */}
 					<div className="space-y-2 mb-4">
 						{options.map((option, index) => (
