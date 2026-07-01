@@ -327,7 +327,6 @@ const EventsGuests = () => {
                             <table className="w-full text-left">
                                 <thead className="bg-black/10 border-b border-white/5">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Image</th>
                                         {eventFields.map(field => (
                                             <th
                                                 key={field.id}
@@ -351,13 +350,6 @@ const EventsGuests = () => {
                                         const isSendingInvite = invitingGuestId === guest.id;
                                         return (
                                             <tr key={guest.id} className="hover:bg-white/5 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="w-9 h-9 rounded-full bg-white border border-white/10 flex items-center justify-center overflow-hidden">
-                                                        {guest.image
-                                                            ? <img src={guest.image} alt={guest.name} className="w-full h-full object-cover" />
-                                                            : <User size={16} className="text-slate-400" />}
-                                                    </div>
-                                                </td>
                                                 {eventFields.map(field => {
                                                     const value = (guest as GuestRecord)[field.field_name];
                                                     return (
