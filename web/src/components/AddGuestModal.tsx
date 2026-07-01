@@ -310,51 +310,46 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                         </>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto p-2">
-                            <div className="md:col-span-2 flex justify-center pb-4">
-                                <div className="relative group">
-                                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
-                                        {newGuest.image ? (
-                                            <img src={newGuest.image} alt="Profile" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User className="text-slate-300" size={40} />
-                                        )}
-                                        {uploading && (
-                                            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                                                <Loader2 className="animate-spin text-primary" size={20} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <label className="absolute -bottom-1 -right-1 p-2 bg-primary text-white rounded-full shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                                        <Upload size={14} />
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                                    </label>
-                                </div>
-                            </div>
                             {fields.sort((a, b) => a.field_order - b.field_order).map(field => {
                                 const value = newGuest[field.field_name] || '';
                                 const onChange = (val: any) => setNewGuest(prev => ({ ...prev, [field.field_name]: val }));
                                 const isRequired = field.required === 1 || field.required === true;
                                 const labelText = `${field.field_name.charAt(0).toUpperCase() + field.field_name.slice(1)}${isRequired ? ' *' : ''}`;
 
-                                const getFieldLabelIcon = (fieldName: string) => {
-                                    switch (fieldName) {
-                                        case 'role':
-                                        case 'organization':
-                                            return <Briefcase size={14} />;
-                                        case 'city':
-                                        case 'country':
-                                            return <MapPin size={14} />;
-                                        default:
-                                            return null;
-                                    }
-                                };
-
                                 switch (field.field_type) {
+                                    case 'image':
+                                        return (
+                                            <div key={field.id} className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                    {labelText}
+                                                </label>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative group">
+                                                        <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
+                                                            {newGuest.image ? (
+                                                                <img src={newGuest.image} alt="Profile" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <User className="text-slate-300" size={40} />
+                                                            )}
+                                                            {uploading && (
+                                                                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+                                                                    <Loader2 className="animate-spin text-primary" size={20} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <label className="absolute -bottom-1 -right-1 p-2 bg-primary text-white rounded-full shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                                                            <Upload size={14} />
+                                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        );
                                     case 'country':
                                         return (
                                             <div key={field.id} className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                    {getFieldLabelIcon(field.field_name)}
                                                     {labelText}
                                                 </label>
                                                 <CountrySelect
@@ -368,7 +363,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                         return (
                                             <div key={field.id} className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                    {getFieldLabelIcon(field.field_name)}
                                                     {labelText}
                                                 </label>
                                                 <input
@@ -418,7 +412,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                         return (
                                             <div key={field.id} className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                    {getFieldLabelIcon(field.field_name)}
                                                     {labelText}
                                                 </label>
                                                 <select
@@ -438,7 +431,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                         return (
                                             <div key={field.id} className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                    {getFieldLabelIcon(field.field_name)}
                                                     {labelText}
                                                 </label>
                                                 <input
@@ -455,7 +447,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                         return (
                                             <div key={field.id} className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                    {getFieldLabelIcon(field.field_name)}
                                                     {labelText}
                                                 </label>
                                                 <input
