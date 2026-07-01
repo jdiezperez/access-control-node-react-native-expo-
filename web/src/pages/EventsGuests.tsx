@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    ArrowLeft, Plus, Upload, Search, X, Check,
+    ArrowLeft, Plus, Upload, Search, X,
     ChevronUp, ChevronDown, Filter, Loader2, Unlink,
     User, QrCode, Mail, AlertCircle, CheckCircle2,
     Mails, Edit2
@@ -24,6 +24,18 @@ interface EventData {
     email_template?: string;
 }
 
+interface EventField {
+    id: number;
+    event_id: number;
+    field_name: string;
+    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date' | 'country';
+    field_values?: string;
+    field_order: number;
+    required: number | boolean;
+}
+
+type GuestRecord = Guest & Record<string, string | number | boolean | null | undefined>;
+
 const EventsGuests = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -31,6 +43,7 @@ const EventsGuests = () => {
 
     const [event, setEvent] = useState<EventData | null>(null);
     const [guests, setGuests] = useState<Guest[]>([]);
+    const [eventFields, setEventFields] = useState<EventField[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [genderFilter, setGenderFilter] = useState('');
@@ -40,7 +53,7 @@ const EventsGuests = () => {
         attended: false
     });
 
-    const [sortField, setSortField] = useState<keyof Guest>('name');
+    const [sortField, setSortField] = useState<string>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const [showAddModal, setShowAddModal] = useState(false);
@@ -49,7 +62,7 @@ const EventsGuests = () => {
     // Invite All modal
     const [showInviteAllModal, setShowInviteAllModal] = useState(false);
     const [inviteAllLoading, setInviteAllLoading] = useState(false);
-    const [inviteAllResult, setInviteAllResult] = useState<{ sent: number; errors: any[] } | null>(null);
+    const [inviteAllResult, setInviteAllResult] = useState<{ sent: number; errors: Array<{ guest?: string; error: string }> } | null>(null);
 
     // Single invite
     const [invitingGuestId, setInvitingGuestId] = useState<number | null>(null);
@@ -69,29 +82,34 @@ const EventsGuests = () => {
         setTimeout(() => setToast(null), 3000);
     };
 
-    useEffect(() => {
-        fetchAll();
-    }, [id]);
-
-    const fetchAll = async () => {
+    const fetchAll = useCallback(async () => {
         try {
             setLoading(true);
-            const [eventRes, guestsRes] = await Promise.all([
+            const [eventRes, guestsRes, fieldsRes] = await Promise.all([
                 axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
                 axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${id}/guests`, {
                     headers: { Authorization: `Bearer ${token}` }
+                }),
+                axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${id}/fields`, {
+                    headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
             setEvent(eventRes.data);
             setGuests(guestsRes.data);
+            setEventFields(fieldsRes.data || []);
         } catch (err) {
             console.error(err);
+            setEventFields([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [id, token]);
+
+    useEffect(() => {
+        void fetchAll();
+    }, [fetchAll]);
 
     const fetchEventGuests = async () => {
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${id}/guests`, {
@@ -112,13 +130,22 @@ const EventsGuests = () => {
         }
     };
 
-    const handleSort = (field: keyof Guest) => {
+    const handleSort = (field: string) => {
         if (sortField === field) {
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
         } else {
             setSortField(field);
             setSortDirection('asc');
         }
+    };
+
+    const formatFieldLabel = (fieldName: string) => fieldName
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+
+    const normalizeCellValue = (value: unknown) => {
+        if (value === null || value === undefined || value === '') return '';
+        return String(value).toLowerCase();
     };
 
     const handleInviteSingle = async (guest: Guest) => {
@@ -131,8 +158,9 @@ const EventsGuests = () => {
             );
             showToast(`Invitation sent to ${guest.name} ${guest.surname}`);
             fetchEventGuests();
-        } catch (err: any) {
-            showToast(err.response?.data?.message || 'Failed to send invitation', 'error');
+        } catch (err: unknown) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.message : 'Failed to send invitation';
+            showToast(String(message || 'Failed to send invitation'), 'error');
         } finally {
             setInvitingGuestId(null);
         }
@@ -149,8 +177,9 @@ const EventsGuests = () => {
             );
             setInviteAllResult(res.data);
             fetchEventGuests();
-        } catch (err: any) {
-            showToast(err.response?.data?.message || 'Failed to send invitations', 'error');
+        } catch (err: unknown) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.message : 'Failed to send invitations';
+            showToast(String(message || 'Failed to send invitations'), 'error');
             setShowInviteAllModal(false);
         } finally {
             setInviteAllLoading(false);
@@ -160,10 +189,12 @@ const EventsGuests = () => {
     const canInviteAll = event?.status === 'active' && !!event?.email_template;
 
     const filteredGuests = guests.filter(g => {
+        const guestData = g as GuestRecord;
         const searchLower = search.toLowerCase();
         const matchesSearch = !search || [
-            g.name, g.surname, g.role, g.organization, g.city, g.country, g.gender, g.email
-        ].some(val => val?.toLowerCase().includes(searchLower));
+            g.name, g.surname, g.role, g.organization, g.city, g.country, g.gender, g.email,
+            ...eventFields.map(field => guestData[field.field_name])
+        ].some(val => String(val ?? '').toLowerCase().includes(searchLower));
 
         const matchesGender = !genderFilter || g.gender === genderFilter;
         const matchesInvited = !statusFilters.invited || g.invited;
@@ -172,26 +203,14 @@ const EventsGuests = () => {
 
         return matchesSearch && matchesGender && matchesInvited && matchesAccepted && matchesAttended;
     }).sort((a, b) => {
-        const valA = a[sortField] || '';
-        const valB = b[sortField] || '';
+        const guestA = a as GuestRecord;
+        const guestB = b as GuestRecord;
+        const valA = normalizeCellValue(guestA[sortField]);
+        const valB = normalizeCellValue(guestB[sortField]);
         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
     });
-
-    const renderBooleanCell = (val: boolean, date: string | null) => {
-        if (val) {
-            return (
-                <div className="flex flex-col">
-                    <span className="text-green-400 font-bold flex items-center gap-1">
-                        <Check size={14} /> Yes
-                    </span>
-                    {date && <span className="text-[10px] text-slate-500">{new Date(date).toLocaleDateString()}</span>}
-                </div>
-            );
-        }
-        return (<X size={18} className="text-red-400" />);
-    };
 
     return (
         <div className="space-y-8">
@@ -309,15 +328,15 @@ const EventsGuests = () => {
                                 <thead className="bg-black/10 border-b border-white/5">
                                     <tr>
                                         <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black">Image</th>
-                                        {['name', 'surname', 'role', 'organization', 'city', 'country', 'gender', 'email', 'invited', 'accepted', 'attended'].map(field => (
+                                        {eventFields.map(field => (
                                             <th
-                                                key={field}
-                                                onClick={() => handleSort(field as keyof Guest)}
+                                                key={field.id}
+                                                onClick={() => handleSort(field.field_name)}
                                                 className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
                                             >
                                                 <div className="flex items-center gap-1">
-                                                    {field.replace('_', ' ')}
-                                                    {sortField === field && (
+                                                    {formatFieldLabel(field.field_name)}
+                                                    {sortField === field.field_name && (
                                                         sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                                                     )}
                                                 </div>
@@ -339,17 +358,14 @@ const EventsGuests = () => {
                                                             : <User size={16} className="text-slate-400" />}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.name}</td>
-                                                <td className="px-6 py-4 text-slate-200 text-sm capitalize">{guest.surname}</td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.role || '-'}</td>
-                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.organization || '-'}</td>
-                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.city || '-'}</td>
-                                                <td className="px-6 py-4 text-slate-300 text-sm capitalize">{guest.country || '-'}</td>
-                                                <td className="px-6 py-4 text-slate-400 text-sm capitalize">{guest.gender || '-'}</td>
-                                                <td className="px-6 py-4 text-slate-300 text-sm">{guest.email}</td>
-                                                <td className="px-6 py-4">{renderBooleanCell(guest.invited, guest.invited_date)}</td>
-                                                <td className="px-6 py-4">{renderBooleanCell(guest.accepted, guest.accepted_date)}</td>
-                                                <td className="px-6 py-4">{renderBooleanCell(guest.attended, guest.attended_date)}</td>
+                                                {eventFields.map(field => {
+                                                    const value = (guest as GuestRecord)[field.field_name];
+                                                    return (
+                                                        <td key={field.id} className="px-6 py-4 text-slate-300 text-sm">
+                                                            {value === null || value === undefined || value === '' ? '-' : String(value)}
+                                                        </td>
+                                                    );
+                                                })}
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-1">
                                                         {/* Invite single */}
