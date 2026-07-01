@@ -5,6 +5,11 @@ import axios from 'axios';
 interface Template {
 	id: number;
 	name: string;
+    fields: {
+        field_name: string;
+        field_type: string;
+        required: boolean;
+    }[];
 }
 
 interface FieldTemplateSelectorProps {
@@ -21,10 +26,6 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 	const [copying, setCopying] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	useEffect(() => {
-		fetchTemplates();
-	}, [eventId]);
-
 	const fetchTemplates = async () => {
 		try {
 			setLoading(true);
@@ -33,6 +34,7 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
 			setTemplates(res.data);
+            console.log('Fetched templates:', res.data);
 		} catch (err) {
 			console.error(err);
 			setError('Failed to load templates');
@@ -41,13 +43,13 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 		}
 	};
 
+    useEffect(() => {
+		fetchTemplates();
+	}, [eventId]);
+
 	const handleCopy = async () => {
 		if (!selectedId) {
 			setError('Please select a template');
-			return;
-		}
-
-		if (!window.confirm('This action will delete existing fields')) {
 			return;
 		}
 
@@ -99,26 +101,35 @@ const FieldTemplateSelector: React.FC<FieldTemplateSelectorProps> = ({ eventId, 
 					) : (
 						<div className="space-y-3">
 							{templates.map(template => (
-								<label
-									key={template.id}
-									className={`
-										relative flex items-center gap-4 px-5 py-4 rounded-xl cursor-pointer transition-all border
-										${selectedId === template.id
-											? 'border-blue-500/50 bg-blue-500/10 ring-2 ring-blue-500/20'
-											: 'border-slate-200 bg-white hover:border-slate-300'}
-									`}
-								>
-									<input
-										type="radio"
-										name="template"
-										value={template.id}
-										checked={selectedId === template.id}
-										onChange={(e) => setSelectedId(parseInt(e.target.value))}
-										className="sr-only"
-									/>
-									<div className={`w-4 h-4 rounded-full border-2 ${selectedId === template.id ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`} />
-									<span className="font-semibold text-slate-800">{template.name}</span>
-								</label>
+                                <label
+                                    key={template.id}
+                                    className={`
+                                        relative flex items-center gap-4 px-5 py-4 rounded-xl cursor-pointer transition-all border
+                                        ${selectedId === template.id
+                                            ? 'border-blue-500/50 bg-blue-500/10 ring-2 ring-blue-500/20'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'}
+                                    `}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="template"
+                                        value={template.id}
+                                        checked={selectedId === template.id}
+                                        onChange={(e) => setSelectedId(parseInt(e.target.value))}
+                                        className="sr-only"
+                                    />
+                                    <div className={`w-4 h-4 rounded-full border-2 ${selectedId === template.id ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`} />
+                                    <div>
+                                        <span className="font-semibold text-slate-800">{template.name}</span>
+                                        <p>
+                                            {template.fields.map(field => (
+                                                <span key={field.field_name} className="inline-block bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded-md mr-2 capitalize">
+                                                    {field.field_name} {field.required ? '*' : ''} <span className="lowercase">({field.field_type})</span>
+                                                </span>
+                                            ))}
+                                        </p>
+                                    </div>
+                                </label>
 							))}
 						</div>
 					)}

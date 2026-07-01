@@ -1348,14 +1348,16 @@ app.get('/api/admin/events/:eventId/field-templates', authenticateToken, isManag
 				model: Field,
 				as: 'fields',
 				required: true,
-				attributes: []
+				attributes: ['field_name', 'field_type', 'field_order', 'required'],
 			}],
 			where: {
 				company_id: req.user.company_id,
 				id: { [Op.ne]: req.params.eventId }
 			},
-			group: ['Event.id'],
-			order: [['name', 'ASC']]
+			order: [
+                ['name', 'ASC'],
+                [{ model: Field, as: 'fields' }, 'field_order', 'ASC']
+            ]
 		});
 
 		res.json(templates);
