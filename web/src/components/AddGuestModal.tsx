@@ -9,7 +9,7 @@ interface Field {
     id: number;
     event_id: number;
     field_name: string;
-    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date';
+    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date' | 'country';
     field_values?: string;
     field_order: number;
     required: number | boolean;
@@ -309,7 +309,7 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                             )}
                         </>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto pr-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto p-2">
                             <div className="md:col-span-2 flex justify-center pb-4">
                                 <div className="relative group">
                                     <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
@@ -349,44 +349,21 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                     }
                                 };
 
-                                // Custom CountrySelect
-                                if (field.field_name === 'country') {
-                                    return (
-                                        <div key={field.id} className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                {getFieldLabelIcon(field.field_name)}
-                                                {labelText}
-                                            </label>
-                                            <CountrySelect
-                                                value={value}
-                                                onChange={onChange}
-                                                className="w-full px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
-                                            />
-                                        </div>
-                                    );
-                                }
-
-                                // Custom Email input with icon
-                                if (field.field_name === 'email') {
-                                    return (
-                                        <div key={field.id} className="md:col-span-2 space-y-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase">{labelText}</label>
-                                            <div className="relative">
-                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                                <input
-                                                    required={isRequired}
-                                                    type="email"
+                                switch (field.field_type) {
+                                    case 'country':
+                                        return (
+                                            <div key={field.id} className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                    {getFieldLabelIcon(field.field_name)}
+                                                    {labelText}
+                                                </label>
+                                                <CountrySelect
                                                     value={value}
-                                                    onChange={e => onChange(e.target.value)}
-                                                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                                    placeholder="email@example.com"
+                                                    onChange={onChange}
+                                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
                                                 />
                                             </div>
-                                        </div>
-                                    );
-                                }
-
-                                switch (field.field_type) {
+                                        );
                                     case 'number':
                                         return (
                                             <div key={field.id} className="space-y-2">

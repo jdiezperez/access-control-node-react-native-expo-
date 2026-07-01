@@ -24,7 +24,8 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 		{ id: 'number', label: 'Number', description: 'Numeric input' },
 		{ id: 'yes/no', label: 'Yes/No', description: 'Boolean choice' },
 		{ id: 'options', label: 'Options', description: 'Multiple choice dropdown' },
-		{ id: 'date', label: 'Date', description: 'Date picker' }
+		{ id: 'date', label: 'Date', description: 'Date picker' },
+		{ id: 'country', label: 'Country', description: 'Country selection' }
 	];
 
 	const handleAddOption = () => {

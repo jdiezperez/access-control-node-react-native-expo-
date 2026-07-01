@@ -308,7 +308,7 @@ const Field = sequelize.define('Field', {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      isIn: [['text', 'number', 'yes/no', 'options']]
+      isIn: [['text', 'number', 'yes/no', 'options', 'date', 'country']]
     }
   },
   field_values: DataTypes.TEXT,
