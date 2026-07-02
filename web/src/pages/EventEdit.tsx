@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy, AlertTriangle } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy, AlertTriangle, X } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
 import CountrySelect from '@/components/CountrySelect';
 import EventFieldsBuilder from '@/components/EventFieldsBuilder';
@@ -13,8 +13,8 @@ const EventEdit = () => {
 	const location = useLocation();
 	const token = localStorage.getItem('token');
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
-	const [loading, setLoading] = useState(true);
-	const [uploading, setUploading] = useState(false);
+	const [loading, setLoading] = useState<boolean>(true);
+	const [uploading, setUploading] = useState<boolean>(false);
 	const [event, setEvent] = useState({
 		name: '',
 		city: '',
@@ -27,9 +27,9 @@ const EventEdit = () => {
 	});
 
 	const isNew = id === 'new' || !id;
-	const [showTemplateSelector, setShowTemplateSelector] = useState(false);
-	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-	const [deleting, setDeleting] = useState(false);
+	const [showTemplateSelector, setShowTemplateSelector] = useState<boolean>(false);
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+	const [deleting, setDeleting] = useState<boolean>(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
 	//	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
 	const [activeTab, setActiveTab] = useState<'info' | 'fields'>('info');
@@ -146,6 +146,9 @@ const EventEdit = () => {
 		}, 0);
 	};
 
+    // Today's date in YYYY-MM-DD format for setting min attribute on date inputs
+    const today = new Date().toISOString().split('T')[0];
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center min-h-[400px]">
@@ -200,7 +203,7 @@ const EventEdit = () => {
 						<>
 							{/* Status Section */}
 							<div className="pb-4 border-b border-white/5">
-								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3" onClick={() => setError('oops')}>
 									<Tag size={14} className="text-primary" /> Event Status
 								</label>
 								<div className="flex flex-wrap gap-4">
@@ -319,37 +322,40 @@ const EventEdit = () => {
 									</div>
 								</div>
 
-<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-								{/* Start Date */}
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Calendar size={14} className="text-white" /> Start Date <span className="text-red-400">*</span>
-									</label>
-									<input
-										type="date"
-										name="date_start"
-										required
-										value={event.date_start || ''}
-										onChange={handleChange}
-										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-										style={{ background: 'rgba(255,255,255,0.03)' }}
-									/>
-								</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Start Date */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Calendar size={14} className="text-white" /> Start Date <span className="text-red-400">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            name="date_start"
+                                            min={today}
+                                            required
+                                            value={event.date_start || ''}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                            style={{ background: 'rgba(255,255,255,0.03)' }}
+                                        />
+                                    </div>
 
-								{/* End Date */}
-								<div className="space-y-2">
-									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Calendar size={14} className="text-white" /> End Date
-									</label>
-									<input
-										type="date"
-										name="date_end"
-										value={event.date_end || ''}
-										onChange={handleChange}
-										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-										style={{ background: 'rgba(255,255,255,0.03)' }}
-									/>
-								</div>
+
+                                    {/* End Date */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Calendar size={14} className="text-white" /> End Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            name="date_end"
+                                            min={event.date_start || today}
+                                            value={event.date_end || ''}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                                            style={{ background: 'rgba(255,255,255,0.03)' }}
+                                        />
+                                    </div>
 								</div>
 
 								{/* City */}
