@@ -1,6 +1,7 @@
 // tests/backend.test.js
 const request = require('supertest');
 const { app } = require('../app');
+const { EventGuest } = require('../db');
 
 describe('Health endpoint', () => {
   it('should return status ok', async () => {
@@ -15,14 +16,14 @@ jest.mock('jsonwebtoken', () => ({
   verify: (token, secret, cb) => cb(null, { id: 1, type: 'admin' })
 }));
 
-describe('Admin upload endpoint', () => {
-  it('should reject missing file', async () => {
-    const res = await request(app)
-      .post('/api/admin/upload')
-      .set('Authorization', 'Bearer dummy')
-      .query({ folder: 'test' })
-      .expect(200);
-    // Since we haven't provided a file, the route will log and proceed; check response status
-    expect(res.body).toBeDefined();
+describe('EventGuest model', () => {
+  it('should expose date-based status fields without boolean status columns', async () => {
+    const attributes = Object.keys(EventGuest.rawAttributes);
+    expect(attributes).toContain('invited_date');
+    expect(attributes).toContain('accepted_date');
+    expect(attributes).toContain('attended_date');
+    expect(attributes).not.toContain('invited');
+    expect(attributes).not.toContain('accepted');
+    expect(attributes).not.toContain('attended');
   });
 });

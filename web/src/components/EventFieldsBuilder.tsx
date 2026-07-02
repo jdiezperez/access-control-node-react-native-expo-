@@ -10,6 +10,7 @@ interface Field {
 	field_values?: string;
 	required?: boolean;
 	field_order?: number;
+    editable?: boolean;
 }
 
 interface EventFieldsBuilderProps {
@@ -29,7 +30,8 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 		field_name: '',
 		field_type: 'text',
 		field_values: '',
-		required: false
+		required: false,
+        editable: true
 	});
 	const [error, setError] = useState<string | null>(null);
 	const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -78,7 +80,8 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 					field_name: newField.field_name,
 					field_type: newField.field_type,
 					field_values: newField.field_values || null,
-					required: newField.required
+					required: newField.required,
+                    editable: true
 				},
 				{ headers: { Authorization: `Bearer ${token}` } }
 			);
@@ -96,7 +99,8 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 				field_name: '',
 				field_type: 'text',
 				field_values: '',
-				required: false
+				required: false,
+				editable: true
 			});
 			setShowAddForm(false);
 		} catch (err: any) {
@@ -303,7 +307,7 @@ const EventFieldsBuilder: React.FC<EventFieldsBuilderProps> = ({ eventId, refres
 									</div>
 								)}
 
-								{editingId !== field.id && (
+								{(editingId !== field.id && field.editable) && (
 									<div className="flex gap-2 shrink-0">
 										<button
 											type="button"

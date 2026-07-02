@@ -30,7 +30,6 @@ const EventEdit = () => {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [fieldsRefresh, setFieldsRefresh] = useState(0);
-	const state = location.state as { tab?: string } | null;
 	//	const [activeTab, setActiveTab] = useState<'info' | 'fields'>(() => state?.tab === 'fields' && !isNew ? 'fields' : 'info'
 	const [activeTab, setActiveTab] = useState<'info' | 'fields'>('info');
 

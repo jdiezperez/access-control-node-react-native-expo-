@@ -11,6 +11,8 @@ interface UserModalProps {
 }
 
 const UserModal = ({ isOpen, onClose, onSave, userToEdit, companyInfo }: UserModalProps) => {
+    void companyInfo;
+
     const [formData, setFormData] = useState({
         name: '',
         surname: '',

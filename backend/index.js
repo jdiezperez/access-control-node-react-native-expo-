@@ -778,22 +778,24 @@ app.get('/api/admin/guests', authenticateToken, isManagerOrAdmin, async (req, re
 
 app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
 	try {
-		const events = await Event.findAll({
+		const eventGuests = await EventGuest.findAll({
+			where: { guest_id: req.params.id },
 			include: [{
-				model: Guest,
-				as: 'guests',
-				where: { id: req.params.id },
-				required: true,
-				attributes: []
+				model: Event,
+				as: 'event',
+				where: { company_id: req.user.company_id },
+				attributes: ['name', 'date']
 			}],
-			where: { company_id: req.user.company_id },
-			attributes: [
-				'name', 'date',
-				[sequelize.literal('invited'), 'invited'],
-				[sequelize.literal('accepted'), 'accepted'],
-				[sequelize.literal('attended'), 'attended']
-			]
+			attributes: ['invited_date', 'accepted_date', 'attended_date']
 		});
+
+		const events = eventGuests.map((entry) => ({
+			name: entry.event?.name,
+			date: entry.event?.date,
+			invited: Boolean(entry.invited_date),
+			accepted: Boolean(entry.accepted_date),
+			attended: Boolean(entry.attended_date)
+		}));
 		res.json(events);
 	} catch (err) {
 		console.error(err);
@@ -1006,8 +1008,7 @@ app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isMa
 		let guest = {
 			id: g.id,
 			email: g.email,
-			invitation_code: eg.invitation_code,
-			name: '', surname: '', city: '', country: '', role: '', organization: ''
+			invitation_code: eg.invitation_code
 		};
 		guestDataRows.forEach(row => {
 			if (row.field) {
@@ -1027,7 +1028,7 @@ app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isMa
 			return res.status(500).json({ message: 'Email delivery failed' });
 		}
 
-		await eg.update({ invited: true, invited_date: new Date() });
+		await eg.update({ invited_date: new Date() });
 		res.json({ success: true });
 	} catch (err) {
 		const msg = err.response?.data?.message || err.message;
@@ -1064,8 +1065,7 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 			let guestObj = {
 				id: g.id,
 				email: g.email,
-				invitation_code: eg ? eg.invitation_code : '',
-				name: '', surname: '', city: '', country: '', role: '', organization: ''
+				invitation_code: eg ? eg.invitation_code : ''
 			};
 			guestDataRows.forEach(row => {
 				if (row.field) {
@@ -1094,7 +1094,7 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 
 		if (successGuestIds.length > 0) {
 			await EventGuest.update(
-				{ invited: true, invited_date: new Date() },
+				{ invited_date: new Date() },
 				{ where: { event_id: req.params.id, guest_id: { [Op.in]: successGuestIds } } }
 			);
 		}
@@ -1127,9 +1127,11 @@ app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, r
 				company_id: req.user.company_id
 			}, { transaction: t });
 
-			await Field.create({ event_id: event.id, field_name: 'name', field_type: 'text', field_order: 0, required: true }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'surname', field_type: 'text', field_order: 1, required: true }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'email', field_type: 'text', field_order: 2, required: true }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'Name', field_type: 'text', field_order: 0, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'Surname', field_type: 'text', field_order: 1, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'Email', field_type: 'text', field_order: 2, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'City', field_type: 'text', field_order: 3, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'Country', field_type: 'country', field_order: 4, required: true, editable: false }, { transaction: t });
 
 			if (req.user.type === 'manager') {
 				await EventUser.create({ user_id: req.user.id, event_id: event.id }, { transaction: t });
@@ -1246,7 +1248,8 @@ app.post('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmi
 			field_type,
 			field_values: field_values || null,
 			field_order: nextOrder,
-			required: required ? true : false
+			required: required ? true : false,
+            editable: false
 		});
 
 		res.json({ id: field.id });
@@ -1631,14 +1634,13 @@ app.get('/api/admin/events/:id/guests', authenticateToken, isManagerOrAdmin, isE
 				id: g.id,
 				email: g.email,
 				creation_date: g.creation_date,
-				invited: eg ? (eg.invited ? 1 : 0) : 0,
+				invited: Boolean(eg?.invited_date),
 				invited_date: eg ? eg.invited_date : null,
-				accepted: eg ? (eg.accepted ? 1 : 0) : 0,
+				accepted: Boolean(eg?.accepted_date),
 				accepted_date: eg ? eg.accepted_date : null,
-				attended: eg ? (eg.attended ? 1 : 0) : 0,
+				attended: Boolean(eg?.attended_date),
 				attended_date: eg ? eg.attended_date : null,
-				invitation_code: eg ? eg.invitation_code : null,
-				name: '', surname: '', role: '', organization: '', city: '', country: '', gender: ''
+				invitation_code: eg ? eg.invitation_code : null
 			};
 
 			rows.forEach(r => {
@@ -1886,7 +1888,7 @@ app.get('/api/public/confirmation/:code', async (req, res) => {
 			where: { invitation_code: req.params.code }
 		});
 		if (!eg) return res.status(404).json({ message: 'Invalid invitation code' });
-		if (eg.accepted) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
+		if (eg.accepted_date) return res.status(400).json({ message: 'This invitation has already been used and confirmed.' });
 
 		const guest = await Guest.findByPk(eg.guest_id);
 		const event = await Event.findByPk(eg.event_id);
@@ -1905,16 +1907,9 @@ app.get('/api/public/confirmation/:code', async (req, res) => {
 			city: event.city,
 			country: event.country,
 			date: event.date,
-			accepted: eg.accepted ? 1 : 0,
-			invitation_code: eg.invitation_code,
-			name: '', surname: '', role: '', organization: '', city: '', country: '', gender: ''
+			accepted: eg.accepted_date ? 1 : 0,
+			invitation_code: eg.invitation_code
 		};
-
-		fieldRows.forEach(r => {
-			if (r.field) {
-				data[r.field.field_name] = r.field_value;
-			}
-		});
 
 		res.json(data);
 	} catch (err) {
@@ -1930,7 +1925,7 @@ app.post('/api/public/confirm', async (req, res) => {
 			where: { invitation_code: code }
 		});
 		if (!eg) return res.status(404).json({ message: 'Invalid code' });
-		if (eg.accepted) return res.status(400).json({ message: 'Invitation already confirmed' });
+		if (eg.accepted_date) return res.status(400).json({ message: 'Invitation already confirmed' });
 
 		const guest = await Guest.findByPk(eg.guest_id);
 		const event = await Event.findByPk(eg.event_id);
@@ -1947,7 +1942,7 @@ app.post('/api/public/confirm', async (req, res) => {
 					}, { transaction: t });
 				}
 			}
-			await eg.update({ accepted: true, accepted_date: new Date() }, { transaction: t });
+			await eg.update({ accepted_date: new Date() }, { transaction: t });
 		});
 
 		// Send Badge Email
@@ -2043,7 +2038,7 @@ app.post('/api/mobile/validate', authenticateToken, isStaff, async (req, res) =>
 			if (gdSurname) guestSurname = gdSurname.field_value || '';
 		}
 
-		await eg.update({ attended: true, attended_date: new Date() });
+		await eg.update({ attended_date: new Date() });
 
 		res.json({
 			success: true,
@@ -2058,10 +2053,18 @@ app.post('/api/mobile/validate', authenticateToken, isStaff, async (req, res) =>
 });
 
 // Start DB then listen
-initDb().then(() => {
-	app.listen(PORT, () => {
-		console.log(`Server running on http://localhost:${PORT}`);
+initDb()
+	.then(() => {
+		const server = app.listen(PORT, () => {
+			console.log(`Server running on http://localhost:${PORT}`);
+		});
+
+		server.on('error', (err) => {
+			console.error('Failed to start server:', err);
+			process.exit(1);
+		});
+	})
+	.catch(err => {
+		console.error('Failed to initialize database:', err);
+		process.exit(1);
 	});
-}).catch(err => {
-	console.error('Failed to initialize database:', err);
-});

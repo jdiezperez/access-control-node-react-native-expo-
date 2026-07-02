@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
 const bcrypt = require('bcrypt');
@@ -231,20 +232,8 @@ const EventGuest = sequelize.define('EventGuest', {
     },
     onDelete: 'CASCADE'
   },
-  invited: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
   invited_date: DataTypes.DATE,
-  accepted: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
   accepted_date: DataTypes.DATE,
-  attended: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
   attended_date: DataTypes.DATE,
   invitation_code: {
     type: DataTypes.STRING,
@@ -319,6 +308,10 @@ const Field = sequelize.define('Field', {
   required: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  editable: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   },
   created_at: {
     type: DataTypes.DATE,
@@ -399,6 +392,11 @@ Sponsor.belongsToMany(Event, { through: EventSponsor, foreignKey: 'sponsor_id', 
 // Many-to-Many: Events <-> Guests
 Event.belongsToMany(Guest, { through: EventGuest, foreignKey: 'event_id', otherKey: 'guest_id', as: 'guests' });
 Guest.belongsToMany(Event, { through: EventGuest, foreignKey: 'guest_id', otherKey: 'event_id', as: 'events' });
+
+Event.hasMany(EventGuest, { foreignKey: 'event_id', as: 'eventGuests', onDelete: 'CASCADE' });
+EventGuest.belongsTo(Event, { foreignKey: 'event_id', as: 'event' });
+Guest.hasMany(EventGuest, { foreignKey: 'guest_id', as: 'eventGuests', onDelete: 'CASCADE' });
+EventGuest.belongsTo(Guest, { foreignKey: 'guest_id', as: 'guest' });
 
 // Many-to-Many: Events <-> Users
 Event.belongsToMany(User, { through: EventUser, foreignKey: 'event_id', otherKey: 'user_id', as: 'assignedUsers' });

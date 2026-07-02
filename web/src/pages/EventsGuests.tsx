@@ -44,6 +44,11 @@ const EventsGuests = () => {
     const [event, setEvent] = useState<EventData | null>(null);
     const [guests, setGuests] = useState<Guest[]>([]);
     const [eventFields, setEventFields] = useState<EventField[]>([]);
+    const baseGuestFields: EventField[] = [
+        { id: -1, event_id: -1, field_name: 'invited_date', field_type: 'date', field_order: 0, required: 0 },
+        { id: -2, event_id: -1, field_name: 'accepted_date', field_type: 'date', field_order: 1, required: 0 },
+        { id: -3, event_id: -1, field_name: 'attended_date', field_type: 'date', field_order: 2, required: 0 }
+    ];
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [genderFilter, setGenderFilter] = useState('');
@@ -98,17 +103,17 @@ const EventsGuests = () => {
             ]);
             setEvent(eventRes.data);
             setGuests(guestsRes.data);
-            setEventFields(fieldsRes.data || []);
+            setEventFields([...(fieldsRes.data || []), ...baseGuestFields]);
         } catch (err) {
             console.error(err);
-            setEventFields([]);
+            setEventFields(baseGuestFields);
         } finally {
             setLoading(false);
         }
-    }, [id, token]);
+    }, [baseGuestFields, id, token]);
 
     useEffect(() => {
-        void fetchAll();
+        fetchAll();
     }, [fetchAll]);
 
     const fetchEventGuests = async () => {
@@ -142,6 +147,21 @@ const EventsGuests = () => {
     const formatFieldLabel = (fieldName: string) => fieldName
         .replace(/_/g, ' ')
         .replace(/\b\w/g, char => char.toUpperCase());
+
+    const formatCellValue = (value: unknown) => {
+        if (value === null || value === undefined || value === '') return '-';
+
+        if (typeof value === 'string' && value.trim()) {
+            const trimmed = value.trim();
+            const date = new Date(trimmed);
+            if (!Number.isNaN(date.getTime()) && trimmed.includes('-')) {
+                return date.toLocaleString();
+            }
+            return trimmed;
+        }
+
+        return String(value);
+    };
 
     const normalizeCellValue = (value: unknown) => {
         if (value === null || value === undefined || value === '') return '';
@@ -188,12 +208,17 @@ const EventsGuests = () => {
 
     const canInviteAll = event?.status === 'active' && !!event?.email_template;
 
+    const displayedFields = [
+        ...eventFields.filter(field => !baseGuestFields.some(baseField => baseField.field_name === field.field_name)),
+        ...baseGuestFields
+    ];
+
     const filteredGuests = guests.filter(g => {
         const guestData = g as GuestRecord;
         const searchLower = search.toLowerCase();
         const matchesSearch = !search || [
             g.name, g.surname, g.role, g.organization, g.city, g.country, g.gender, g.email,
-            ...eventFields.map(field => guestData[field.field_name])
+            ...displayedFields.map(field => guestData[field.field_name])
         ].some(val => String(val ?? '').toLowerCase().includes(searchLower));
 
         const matchesGender = !genderFilter || g.gender === genderFilter;
@@ -327,7 +352,7 @@ const EventsGuests = () => {
                             <table className="w-full text-left">
                                 <thead className="bg-black/10 border-b border-white/5">
                                     <tr>
-                                        {eventFields.map(field => (
+                                        {displayedFields.map(field => (
                                             <th
                                                 key={field.id}
                                                 onClick={() => handleSort(field.field_name)}
@@ -350,11 +375,11 @@ const EventsGuests = () => {
                                         const isSendingInvite = invitingGuestId === guest.id;
                                         return (
                                             <tr key={guest.id} className="hover:bg-white/5 transition-colors">
-                                                {eventFields.map(field => {
+                                                {displayedFields.map(field => {
                                                     const value = (guest as GuestRecord)[field.field_name];
                                                     return (
                                                         <td key={field.id} className="px-6 py-4 text-slate-300 text-sm">
-                                                            {value === null || value === undefined || value === '' ? '-' : String(value)}
+                                                            {formatCellValue(value)}
                                                         </td>
                                                     );
                                                 })}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, X, Plus, Loader2, Upload, User, MapPin, Briefcase, Mail } from 'lucide-react';
+import { Search, X, Plus, Loader2, Upload, User, MapPin, Briefcase } from 'lucide-react';
 import type { Guest } from '@/data/Types';
 import { getImagePath } from '@/utils/imagePath';
 import CountrySelect from './CountrySelect';
@@ -9,7 +9,7 @@ interface Field {
     id: number;
     event_id: number;
     field_name: string;
-    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date' | 'country';
+    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date' | 'country' | 'image';
     field_values?: string;
     field_order: number;
     required: number | boolean;
