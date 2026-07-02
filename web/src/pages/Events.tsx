@@ -4,6 +4,16 @@ import { Calendar, MapPin, Plus, Image as ImageIcon, Star, User, Loader2, Calend
 import { useNavigate } from 'react-router-dom';
 import { getImagePath } from '@/utils/imagePath';
 
+const formatEventDateRange = (eventItem: any) => {
+	const start = eventItem?.date_start ? new Date(eventItem.date_start).toLocaleDateString() : '';
+	const end = eventItem?.date_end ? new Date(eventItem.date_end).toLocaleDateString() : '';
+
+	if (start && end) {
+		return `${start} – ${end}`;
+	}
+	return start || end || 'Date not set';
+};
+
 const Events = () => {
 	const [events, setEvents] = useState<any[]>([]);
 	const [loading, setLoading] = useState<boolean>(true);
@@ -203,7 +213,7 @@ const Events = () => {
 										<div className="flex flex-col justify-center space-y-1.5 text-slate-400">
 											<div className="flex items-center gap-2 text-sm">
 												<Calendar size={13} className="text-primary" />
-												<span>{event.date ? new Date(event.date).toLocaleDateString() : 'Date not set'}</span>
+												<span>{formatEventDateRange(event)}</span>
 											</div>
 											<div className="flex items-center gap-2 text-sm">
 												<MapPin size={13} className="text-primary" />

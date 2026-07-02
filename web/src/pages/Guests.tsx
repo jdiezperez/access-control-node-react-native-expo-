@@ -253,7 +253,7 @@ const Guests = () => {
                                                                                 <tr key={i} className="hover:bg-white/5 transition-colors">
                                                                                     <td className="px-6 py-3 text-sm font-semibold text-white">{ev.name}</td>
                                                                                     <td className="px-6 py-3 text-sm text-slate-400">
-                                                                                        {ev.date ? new Date(ev.date).toLocaleDateString() : '-'}
+                                                                                        {ev.date_start ? new Date(ev.date_start).toLocaleDateString() : '-'}
                                                                                     </td>
                                                                                     <td className="px-6 py-3 text-center">
                                                                                         {ev.invited ? <Check size={16} className="mx-auto text-blue-400" /> : <X size={16} className="mx-auto text-slate-600" />}
@@ -334,7 +334,7 @@ const Guests = () => {
                                                     <div key={i} className="flex flex-col gap-1.5 text-xs pb-2 border-b border-white/5 last:border-b-0 last:pb-0">
                                                         <div className="flex items-center justify-between">
                                                             <span className="font-semibold text-white truncate max-w-[180px]">{ev.name}</span>
-                                                            <span className="text-[10px] text-slate-500">{ev.date ? new Date(ev.date).toLocaleDateString() : '-'}</span>
+                                                            <span className="text-[10px] text-slate-500">{ev.date_start ? new Date(ev.date_start).toLocaleDateString() : '-'}</span>
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${ev.invited ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-white/5 text-slate-600 border-white/5'}`}>Invited</span>

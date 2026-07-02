@@ -12,7 +12,8 @@ interface Event {
     name: string;
     city?: string;
     country?: string;
-    date?: string;
+    date_start?: string;
+    date_end?: string;
     status: 'active' | 'not active';
     logo?: string;
     assigned: 0 | 1;
@@ -225,10 +226,10 @@ const UserAssignEventsModal = ({ isOpen, onClose, user }: UserAssignEventsModalP
                                                         {[event.city, event.country].filter(Boolean).join(', ')}
                                                     </span>
                                                 )}
-                                                {event.date && (
+                                                {event.date_start && (
                                                     <span className="flex items-center gap-1 text-xs text-slate-500">
                                                         <Clock size={11} />
-                                                        {new Date(event.date).toLocaleDateString()}
+                                                        {new Date(event.date_start).toLocaleDateString()}
                                                     </span>
                                                 )}
                                             </div>

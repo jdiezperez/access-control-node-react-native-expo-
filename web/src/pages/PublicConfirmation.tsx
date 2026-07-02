@@ -150,7 +150,7 @@ const PublicConfirmation = () => {
                                     <MapPin size={14} /> {event.city}, {event.country}
                                 </div>
                                 <div className="text-white font-bold">
-                                    {new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {new Date(event.date_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </div>
                             </div>
                         </div>

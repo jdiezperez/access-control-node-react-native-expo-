@@ -6,7 +6,8 @@ import { CheckCircle2, XCircle, Camera, Loader2 } from 'lucide-react';
 interface Event {
   id: number;
   name: string;
-  date: string;
+  date_start: string;
+  date_end: string;
   status: string;
 }
 
@@ -28,16 +29,6 @@ const ScanAccess = () => {
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'web-qr-reader-view';
 
-  useEffect(() => {
-    fetchEvents();
-    return () => {
-      // Clean up scanner on unmount
-      if (qrReaderRef.current) {
-        qrReaderRef.current.stop().catch((err) => console.log('Error stopping scanner', err));
-      }
-    };
-  }, []);
-
   const fetchEvents = async () => {
     setLoadingEvents(true);
     setErrorMessage(null);
@@ -56,6 +47,16 @@ const ScanAccess = () => {
       setLoadingEvents(false);
     }
   };
+
+    useEffect(() => {
+        fetchEvents();
+            return () => {
+            // Clean up scanner on unmount
+            if (qrReaderRef.current) {
+                qrReaderRef.current.stop().catch((err) => console.log('Error stopping scanner', err));
+            }
+        };
+    }, []);
 
   const startScanning = async () => {
     if (!selectedEventId) return;

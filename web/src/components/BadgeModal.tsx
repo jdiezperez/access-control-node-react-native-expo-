@@ -13,7 +13,8 @@ interface BadgeModalProps {
         name: string;
         city?: string;
         country?: string;
-        date?: string;
+        date_start?: string;
+        date_end?: string;
         logo?: string;
     } | null;
 }
@@ -23,8 +24,8 @@ const BadgeModal = ({ isOpen, onClose, guest, event }: BadgeModalProps) => {
 
     if (!isOpen || !event) return null;
 
-    const formattedDate = event.date
-        ? new Date(event.date).toLocaleDateString('en-GB', {
+    const formattedDate = event.date_start
+        ? new Date(event.date_start).toLocaleDateString('en-GB', {
             day: 'numeric', month: 'long', year: 'numeric'
         })
         : null;

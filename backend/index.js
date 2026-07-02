@@ -619,7 +619,7 @@ app.get('/api/admin/users/:id/events', authenticateToken, isManagerOrAdmin, asyn
 						required: true
 					}
 				],
-				order: [['date', 'DESC']]
+				order: [['date_start', 'DESC']]
 			});
 		} else {
 			// Admin or manager viewing their own events: show all company events
@@ -628,7 +628,7 @@ app.get('/api/admin/users/:id/events', authenticateToken, isManagerOrAdmin, asyn
 					status: { [Op.in]: ['not active', 'active'] },
 					company_id: req.user.company_id
 				},
-				order: [['date', 'DESC']]
+				order: [['date_start', 'DESC']]
 			});
 		}
 
@@ -784,14 +784,15 @@ app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, asy
 				model: Event,
 				as: 'event',
 				where: { company_id: req.user.company_id },
-				attributes: ['name', 'date']
+				attributes: ['name', 'date_start', 'date_end']
 			}],
 			attributes: ['invited_date', 'accepted_date', 'attended_date']
 		});
 
 		const events = eventGuests.map((entry) => ({
 			name: entry.event?.name,
-			date: entry.event?.date,
+			date_start: entry.event?.date_start,
+			date_end: entry.event?.date_end,
 			invited: Boolean(entry.invited_date),
 			accepted: Boolean(entry.accepted_date),
 			attended: Boolean(entry.attended_date)
@@ -883,12 +884,13 @@ app.get('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, re
 					attributes: [],
 					required: true
 				}],
-				where: { company_id: req.user.company_id }
+				where: { company_id: req.user.company_id },
+                order: [['date_start', 'DESC']]
 			});
 		} else {
 			events = await Event.findAll({
 				where: { company_id: req.user.company_id },
-				order: [['date']]
+				order: [['date_start', 'DESC']]
 			});
 		}
 		res.json(events);
@@ -924,8 +926,22 @@ const FRONTEND_BASE = process.env.FRONTEND_BASE || 'http://localhost';
 const FRONTEND_PORT = process.env.FRONTEND_PORT || '5173';
 const FRONTEND_URL = `${FRONTEND_BASE}:${FRONTEND_PORT}`;
 
+const formatEventDateRange = (event) => {
+	const start = event?.date_start ? new Date(event.date_start) : null;
+	const end = event?.date_end ? new Date(event.date_end) : null;
+
+	const formatSingleDate = (value) => value ? value.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+	const startText = formatSingleDate(start);
+	const endText = formatSingleDate(end);
+
+	if (startText && endText) {
+		return `${startText} – ${endText}`;
+	}
+	return startText || endText;
+};
+
 const buildEmailHtml = (template, guest, event, invitationCode) => {
-	const date = event.date ? new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+	const date = formatEventDateRange(event);
 	const confirmationLink = `${FRONTEND_URL}/confirm/${invitationCode}`;
 
 	let html = template
@@ -955,7 +971,7 @@ const buildEmailHtml = (template, guest, event, invitationCode) => {
 };
 
 const buildBadgeEmailHtml = (guest, event) => {
-	const date = event.date ? new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+	const date = formatEventDateRange(event);
 	const qrValue = guest.invitation_code || guest.email;
 	const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrValue)}`;
 
@@ -1107,10 +1123,11 @@ app.post('/api/admin/events/:id/invite-all', authenticateToken, isManagerOrAdmin
 });
 
 app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, res) => {
-	const { name, city, country, date, email_template, status, logo } = req.body;
+	const { name, city, country, date_start, date_end, email_template, status, logo } = req.body;
+	const startDate = date_start || null;
 
 	if (!name || !name.trim()) return res.status(400).json({ message: 'Event name is required' });
-	if (!date) return res.status(400).json({ message: 'Date is required' });
+	if (!startDate) return res.status(400).json({ message: 'Start date is required' });
 	if (!city || !city.trim()) return res.status(400).json({ message: 'City is required' });
 	if (!country || !country.trim()) return res.status(400).json({ message: 'Country is required' });
 
@@ -1120,7 +1137,8 @@ app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, r
 				name,
 				city: city || null,
 				country: country || null,
-				date: date || null,
+				date_start: startDate,
+				date_end: date_end || null,
 				email_template: email_template || null,
 				status: status || 'not active',
 				logo: logo || null,
@@ -1148,7 +1166,8 @@ app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, r
 });
 
 app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
-	const { name, city, country, date, email_template, status, logo } = req.body;
+	const { name, city, country, date_start, date_end, email_template, status, logo } = req.body;
+	const startDate = date_start || null;
 	try {
 		const event = await Event.findOne({
 			where: { id: req.params.id, company_id: req.user.company_id }
@@ -1159,7 +1178,8 @@ app.put('/api/admin/events/:id', authenticateToken, isManagerOrAdmin, isEventAss
 			name,
 			city: city || null,
 			country: country || null,
-			date: date || null,
+			date_start: startDate,
+			date_end: date_end || null,
 			email_template: email_template || null,
 			status: status || 'not active',
 			logo: logo || null
@@ -1547,7 +1567,7 @@ app.get('/api/admin/sponsors/:id/events', authenticateToken, isManagerOrAdmin, a
 				required: true
 			}],
 			where: { company_id: req.user.company_id },
-			attributes: ['name', 'date']
+			attributes: ['name', 'date_start']
 		});
 		res.json(events);
 	} catch (err) {
@@ -1906,7 +1926,9 @@ app.get('/api/public/confirmation/:code', async (req, res) => {
 			event_name: event.name,
 			city: event.city,
 			country: event.country,
-			date: event.date,
+			date_start: event.date_start,
+			date_end: event.date_end,
+			date: event.date_start,
 			accepted: eg.accepted_date ? 1 : 0,
 			invitation_code: eg.invitation_code
 		};

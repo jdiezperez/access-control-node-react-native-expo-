@@ -1,7 +1,7 @@
 // tests/backend.test.js
 const request = require('supertest');
 const { app } = require('../app');
-const { EventGuest } = require('../db');
+const { EventGuest, Event } = require('../db');
 
 describe('Health endpoint', () => {
   it('should return status ok', async () => {
@@ -25,5 +25,14 @@ describe('EventGuest model', () => {
     expect(attributes).not.toContain('invited');
     expect(attributes).not.toContain('accepted');
     expect(attributes).not.toContain('attended');
+  });
+});
+
+describe('Event model', () => {
+  it('should expose start and end date fields for events', async () => {
+    const attributes = Object.keys(Event.rawAttributes);
+    expect(attributes).toContain('date_start');
+    expect(attributes).toContain('date_end');
+    expect(attributes).not.toContain('date');
   });
 });

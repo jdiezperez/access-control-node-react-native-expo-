@@ -19,7 +19,8 @@ const EventEdit = () => {
 		name: '',
 		city: '',
 		country: '',
-		date: '',
+		date_start: '',
+		date_end: '',
 		status: 'not active',
 		logo: '',
 		email_template: ''
@@ -50,9 +51,17 @@ const EventEdit = () => {
 					});
 					const currentEvent = res.data.find((e: { id: number }) => e.id === parseInt(id || '0'));
 					if (currentEvent) {
-						// Format date for input type="date"
-						if (currentEvent.date) {
-							currentEvent.date = new Date(currentEvent.date).toISOString().split('T')[0];
+						const formatDateForInput = (value: string) => {
+							if (!value) return '';
+							const date = new Date(value);
+							return Number.isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+						};
+
+						if (currentEvent.date_start) {
+							currentEvent.date_start = formatDateForInput(currentEvent.date_start);
+						}
+						if (currentEvent.date_end) {
+							currentEvent.date_end = formatDateForInput(currentEvent.date_end);
 						}
 						setEvent(currentEvent);
 					} else {
@@ -310,20 +319,37 @@ const EventEdit = () => {
 									</div>
 								</div>
 
-								{/* Date */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								{/* Start Date */}
 								<div className="space-y-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-										<Calendar size={14} className="text-white" /> Date <span className="text-red-400">*</span>
+										<Calendar size={14} className="text-white" /> Start Date <span className="text-red-400">*</span>
 									</label>
 									<input
 										type="date"
-										name="date"
+										name="date_start"
 										required
-										value={event.date || ''}
+										value={event.date_start || ''}
 										onChange={handleChange}
 										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
 										style={{ background: 'rgba(255,255,255,0.03)' }}
 									/>
+								</div>
+
+								{/* End Date */}
+								<div className="space-y-2">
+									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+										<Calendar size={14} className="text-white" /> End Date
+									</label>
+									<input
+										type="date"
+										name="date_end"
+										value={event.date_end || ''}
+										onChange={handleChange}
+										className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+										style={{ background: 'rgba(255,255,255,0.03)' }}
+									/>
+								</div>
 								</div>
 
 								{/* City */}

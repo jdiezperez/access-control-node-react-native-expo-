@@ -258,7 +258,7 @@ const Sponsors = () => {
                                                                                 <tr key={i} className="hover:bg-white/5 transition-colors">
                                                                                     <td className="px-6 py-3 text-sm font-semibold text-white">{ev.name}</td>
                                                                                     <td className="px-6 py-3 text-sm text-slate-400">
-                                                                                        {ev.date ? new Date(ev.date).toLocaleDateString() : '-'}
+                                                                                        {ev.date_start ? new Date(ev.date_start).toLocaleDateString() : '-'}
                                                                                     </td>
                                                                                     <td className="px-6 py-3">
                                                                                         <span className="px-2 py-0.5 bg-green-500/10 text-green-400 rounded text-[10px] font-bold uppercase border border-green-500/20">
@@ -340,7 +340,7 @@ const Sponsors = () => {
                                                 {history[sponsor.id].map((ev, i) => (
                                                     <div key={i} className="flex items-center justify-between text-xs pb-2 border-b border-white/5 last:border-b-0 last:pb-0">
                                                         <span className="font-semibold text-white truncate max-w-[180px]">{ev.name}</span>
-                                                        <span className="text-[10px] text-slate-500">{ev.date ? new Date(ev.date).toLocaleDateString() : '-'}</span>
+                                                        <span className="text-[10px] text-slate-500">{ev.date_start ? new Date(ev.date_start).toLocaleDateString() : '-'}</span>
                                                     </div>
                                                 ))}
                                             </div>

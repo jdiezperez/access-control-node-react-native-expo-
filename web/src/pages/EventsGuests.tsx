@@ -18,7 +18,8 @@ interface EventData {
     name: string;
     city?: string;
     country?: string;
-    date?: string;
+    date_start?: string;
+    date_end?: string;
     logo?: string;
     status: string;
     email_template?: string;

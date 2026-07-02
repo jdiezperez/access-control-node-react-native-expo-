@@ -133,7 +133,8 @@ const Event = sequelize.define('Event', {
   },
   city: DataTypes.STRING,
   country: DataTypes.STRING,
-  date: DataTypes.DATE,
+  date_start: DataTypes.DATE,
+  date_end: DataTypes.DATE,
   email_template: DataTypes.TEXT,
   logo: DataTypes.STRING,
   status: {
@@ -415,7 +416,33 @@ GuestData.belongsTo(Field, { foreignKey: 'field_id', as: 'field' });
 
 // ─── INITIALIZATION & SEEDING ───────────────────────────────────────────────
 
+const ensureEventDateColumns = async () => {
+  if (sequelize.getDialect() !== 'postgres' && sequelize.getDialect() !== 'postgresql') {
+    return;
+  }
+
+  const [rows] = await sequelize.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'events'
+  `);
+
+  const columns = rows.map((row) => row.column_name);
+
+  if (columns.includes('date') && !columns.includes('date_start')) {
+    await sequelize.query('ALTER TABLE "events" RENAME COLUMN "date" TO "date_start"');
+  }
+
+  if (!columns.includes('date_end')) {
+    await sequelize.query('ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "date_end" DATE');
+  }
+};
+
 const initDb = async () => {
+  if (sequelize.getDialect() === 'postgres' || sequelize.getDialect() === 'postgresql') {
+    await ensureEventDateColumns();
+  }
+
   // Sync the database schema (automatically creates tables if they do not exist)
   await sequelize.sync();
 
