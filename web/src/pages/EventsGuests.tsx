@@ -222,7 +222,6 @@ const EventsGuests = () => {
             ...displayedFields.map(field => guestData[field.field_name])
         ].some(val => String(val ?? '').toLowerCase().includes(searchLower));
 
-        const matchesGender = !genderFilter || g.gender === genderFilter;
         const matchesInvited = !statusFilters.invited || g.invited;
         const matchesAccepted = !statusFilters.accepted || g.accepted;
         const matchesAttended = !statusFilters.attended || g.attended;

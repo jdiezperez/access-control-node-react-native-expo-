@@ -95,18 +95,16 @@ const UsersManagement = () => {
             </div>
 
             {/* Top Cards Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="relative col-span-2">
-                    <Search className="absolute left-4 top-1/3 -translate-y-1/2 text-slate-500" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search by name, email or role..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-                        style={{ background: 'rgba(255,255,255,0.05)' }}
-                    />
-                </div>
+            <div className="relative md:col-span-2">
+                <Search className="absolute left-4 top-1/3 text-slate-500" size={18} />
+                <input
+                    type="text"
+                    placeholder="Search by name, email or role..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}
+                />
             </div>
 
             {/* Table — desktop */}
