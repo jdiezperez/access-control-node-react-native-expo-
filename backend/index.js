@@ -885,7 +885,7 @@ app.get('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, re
 					required: true
 				}],
 				where: { company_id: req.user.company_id },
-                order: [['date_start', 'DESC']]
+				order: [['date_start', 'DESC']]
 			});
 		} else {
 			events = await Event.findAll({
@@ -1269,7 +1269,7 @@ app.post('/api/admin/events/:eventId/fields', authenticateToken, isManagerOrAdmi
 			field_values: field_values || null,
 			field_order: nextOrder,
 			required: required ? true : false,
-            editable: false
+			editable: false
 		});
 
 		res.json({ id: field.id });
@@ -1294,6 +1294,7 @@ app.put('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isManag
 			where: { id: req.params.fieldId, event_id: req.params.eventId }
 		});
 		if (!field) return res.status(404).json({ message: 'Field not found' });
+		if (!field.editable) return res.status(404).json({ message: 'Field cannot be edited' });
 
 		const updateData = {};
 		if (field_name !== undefined) updateData.field_name = field_name;
@@ -1322,6 +1323,7 @@ app.delete('/api/admin/events/:eventId/fields/:fieldId', authenticateToken, isMa
 			where: { id: req.params.fieldId, event_id: req.params.eventId }
 		});
 		if (!field) return res.status(404).json({ message: 'Field not found' });
+		if (!field.editable) return res.status(404).json({ message: 'Field cannot be deleted' });
 
 		await field.destroy();
 		res.json({ success: true });
@@ -1378,9 +1380,9 @@ app.get('/api/admin/events/:eventId/field-templates', authenticateToken, isManag
 				id: { [Op.ne]: req.params.eventId }
 			},
 			order: [
-                ['name', 'ASC'],
-                [{ model: Field, as: 'fields' }, 'field_order', 'ASC']
-            ]
+				['name', 'ASC'],
+				[{ model: Field, as: 'fields' }, 'field_order', 'ASC']
+			]
 		});
 
 		res.json(templates);
