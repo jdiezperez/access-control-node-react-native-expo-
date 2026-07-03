@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Briefcase, Loader2, Save, Upload, MapPin } from 'lucide-react';
 import axios from 'axios';
-import CountrySelect from '@/components/CountrySelect';
 
 interface Field {
     id: number;
@@ -12,17 +11,6 @@ interface Field {
     field_order: number;
     required: number | boolean;
 }
-
-const defaultFields: Field[] = [
-    { id: -1, event_id: -1, field_name: 'name', field_type: 'text', field_order: 0, required: 1 },
-    { id: -2, event_id: -1, field_name: 'surname', field_type: 'text', field_order: 1, required: 1 },
-    { id: -3, event_id: -1, field_name: 'email', field_type: 'text', field_order: 2, required: 1 },
-    { id: -4, event_id: -1, field_name: 'role', field_type: 'text', field_order: 3, required: 0 },
-    { id: -5, event_id: -1, field_name: 'organization', field_type: 'text', field_order: 4, required: 0 },
-    { id: -6, event_id: -1, field_name: 'city', field_type: 'text', field_order: 5, required: 0 },
-    { id: -7, event_id: -1, field_name: 'country', field_type: 'text', field_order: 6, required: 0 },
-    { id: -8, event_id: -1, field_name: 'gender', field_type: 'options', field_values: 'male|female|non binary|other|prefer not to say', field_order: 7, required: 0 }
-];
 
 interface GuestModalProps {
     isOpen: boolean;
@@ -50,10 +38,9 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                     setFields(res.data);
                 } catch (err) {
                     console.error('Failed to fetch event fields', err);
-                    setFields(defaultFields);
                 }
             } else {
-                setFields(defaultFields);
+                console.error('Event cannot be empty');
             }
         };
 
@@ -158,19 +145,6 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
         }
     };
 
-    const getFieldLabelIcon = (fieldName: string) => {
-        switch (fieldName) {
-            case 'role':
-            case 'organization':
-                return <Briefcase size={14} />;
-            case 'city':
-            case 'country':
-                return <MapPin size={14} />;
-            default:
-                return null;
-        }
-    };
-
     const sortedFields = [...fields].sort((a, b) => a.field_order - b.field_order);
 
     return (
@@ -227,48 +201,11 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                             const isRequired = field.required === 1 || field.required === true;
                             const labelText = `${field.field_name.charAt(0).toUpperCase() + field.field_name.slice(1)}${isRequired ? ' *' : ''}`;
 
-                            // Custom CountrySelect
-                            if (field.field_name === 'country') {
-                                return (
-                                    <div key={field.id} className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            {getFieldLabelIcon(field.field_name)}
-                                            {labelText}
-                                        </label>
-                                        <CountrySelect
-                                            value={value}
-                                            onChange={onChange}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-white"
-                                        />
-                                    </div>
-                                );
-                            }
-
-                            // Custom Email input with icon
-                            if (field.field_name === 'email') {
-                                return (
-                                    <div key={field.id} className="md:col-span-2 space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase">{labelText}</label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                            <input
-                                                required={isRequired}
-                                                type="email"
-                                                value={value}
-                                                onChange={e => onChange(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            }
-
                             switch (field.field_type) {
                                 case 'number':
                                     return (
                                         <div key={field.id} className="space-y-2">
                                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                {getFieldLabelIcon(field.field_name)}
                                                 {labelText}
                                             </label>
                                             <input
@@ -318,7 +255,6 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                                     return (
                                         <div key={field.id} className="space-y-2">
                                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                {getFieldLabelIcon(field.field_name)}
                                                 {labelText}
                                             </label>
                                             <select
@@ -338,7 +274,6 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                                     return (
                                         <div key={field.id} className="space-y-2">
                                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                {getFieldLabelIcon(field.field_name)}
                                                 {labelText}
                                             </label>
                                             <input
@@ -355,7 +290,6 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                                     return (
                                         <div key={field.id} className="space-y-2">
                                             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                {getFieldLabelIcon(field.field_name)}
                                                 {labelText}
                                             </label>
                                             <input

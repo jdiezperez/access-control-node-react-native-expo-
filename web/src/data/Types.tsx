@@ -5,18 +5,12 @@ export interface Guest {
     type: UserType;
     name: string;
     surname: string;
-    role: string;
-    organization: string;
     city: string;
     country: string;
-    gender: string;
     email: string;
     image: string;
-    invited: boolean;
     invited_date: string | null;
-    accepted: boolean;
     accepted_date: string | null;
-    attended: boolean;
     attended_date: string | null;
     invitation_code?: string;
 }

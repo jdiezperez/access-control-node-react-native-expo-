@@ -25,7 +25,6 @@ const FieldTypeSelector: React.FC<FieldTypeSelectorProps> = ({
 		{ id: 'yes/no', label: 'Yes/No', description: 'Boolean choice' },
 		{ id: 'options', label: 'Options', description: 'Multiple choice dropdown' },
 		{ id: 'date', label: 'Date', description: 'Date picker' },
-		{ id: 'country', label: 'Country', description: 'Country selection' },
 		{ id: 'image', label: 'Image', description: 'Image upload' },
 	];
 

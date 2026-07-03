@@ -15,17 +15,6 @@ interface Field {
     required: number | boolean;
 }
 
-const defaultFields: Field[] = [
-    { id: -1, event_id: -1, field_name: 'name', field_type: 'text', field_order: 0, required: 1 },
-    { id: -2, event_id: -1, field_name: 'surname', field_type: 'text', field_order: 1, required: 1 },
-    { id: -3, event_id: -1, field_name: 'email', field_type: 'text', field_order: 2, required: 1 },
-    { id: -4, event_id: -1, field_name: 'role', field_type: 'text', field_order: 3, required: 0 },
-    { id: -5, event_id: -1, field_name: 'organization', field_type: 'text', field_order: 4, required: 0 },
-    { id: -6, event_id: -1, field_name: 'city', field_type: 'text', field_order: 5, required: 0 },
-    { id: -7, event_id: -1, field_name: 'country', field_type: 'text', field_order: 6, required: 0 },
-    { id: -8, event_id: -1, field_name: 'gender', field_type: 'options', field_values: 'male|female|non binary|other|prefer not to say', field_order: 7, required: 0 }
-];
-
 const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, onAdded: () => void, eventId: string }) => {
     const token = localStorage.getItem('token');
     const [available, setAvailable] = useState<Guest[]>([]);
@@ -70,7 +59,7 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setFields(res.data);
-                
+
                 // Initialize form state
                 const initialData: Record<string, any> = {};
                 res.data.forEach((f: any) => {
@@ -80,13 +69,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                 setNewGuest(initialData);
             } catch (err) {
                 console.error('Failed to fetch event fields', err);
-                setFields(defaultFields);
-                const initialData: Record<string, any> = {};
-                defaultFields.forEach((f: any) => {
-                    initialData[f.field_name] = '';
-                });
-                initialData.image = '';
-                setNewGuest(initialData);
             }
         };
 
@@ -164,7 +146,7 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
 
     const filtered = available.filter(g => {
         const searchLower = search.toLowerCase();
-        return !search || [g.name, g.surname, g.email, g.organization].some(v => v?.toLowerCase().includes(searchLower));
+        return !search || [g.name, g.surname, g.email, g.city, g.country].some(v => v?.toLowerCase().includes(searchLower));
     });
 
     const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);

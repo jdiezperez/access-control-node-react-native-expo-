@@ -80,7 +80,7 @@ const Guests = () => {
 
     const filtered = guests.filter(g => {
         const s = search.toLowerCase();
-        return !search || [g.name, g.surname, g.email, g.organization].some(v => v?.toLowerCase().includes(s));
+        return !search || [g.name, g.surname, g.email, g.city, g.country].some(v => v?.toLowerCase().includes(s));
     });
 
     if (loading) return (
@@ -129,7 +129,7 @@ const Guests = () => {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                         <input
                             type="text"
-                            placeholder="Search guests by name, email, or organization..."
+                            placeholder="Search guests"
                             className="w-full pl-12 pr-4 py-3 rounded-2xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
                             style={{ background: 'rgba(255,255,255,0.03)' }}
                             value={search}

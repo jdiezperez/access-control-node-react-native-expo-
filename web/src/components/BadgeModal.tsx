@@ -140,12 +140,7 @@ const BadgeModal = ({ isOpen, onClose, guest, event }: BadgeModalProps) => {
                                 <p className="text-xl font-bold text-slate-800 leading-tight capitalize">
                                     {guest.name} {guest.surname}
                                 </p>
-                                {guest.role && (
-                                    <p className="text-sm text-primary font-semibold mt-0.5 capitalize">{guest.role}</p>
-                                )}
-                                {guest.organization && (
-                                    <p className="text-xs text-slate-500 mt-0.5 capitalize">{guest.organization}</p>
-                                )}
+                                {/*** Add custom fields */}
                             </div>
                         </div>
 

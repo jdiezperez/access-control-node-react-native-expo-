@@ -218,7 +218,7 @@ const EventsGuests = () => {
         const guestData = g as GuestRecord;
         const searchLower = search.toLowerCase();
         const matchesSearch = !search || [
-            g.name, g.surname, g.role, g.organization, g.city, g.country, g.gender, g.email,
+            g.name, g.surname, g.city, g.country, g.email,
             ...displayedFields.map(field => guestData[field.field_name])
         ].some(val => String(val ?? '').toLowerCase().includes(searchLower));
 

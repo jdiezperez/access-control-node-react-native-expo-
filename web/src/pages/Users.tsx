@@ -96,7 +96,7 @@ const UsersManagement = () => {
 
             {/* Top Cards Bar */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="relative md:col-span-2">
+                <div className="relative col-span-2">
                     <Search className="absolute left-4 top-1/3 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                         type="text"
@@ -106,13 +106,6 @@ const UsersManagement = () => {
                         className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
                         style={{ background: 'rgba(255,255,255,0.05)' }}
                     />
-                </div>
-                <div className="rounded-2xl px-6 py-4 flex items-center gap-4 border border-white/10" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <Building2 className="text-slate-400" />
-                    <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Organization</p>
-                        <p className="font-bold text-white mt-0.5">{companyInfo?.name || 'Company Name'}</p>
-                    </div>
                 </div>
             </div>
 
