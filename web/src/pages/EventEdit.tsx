@@ -146,8 +146,8 @@ const EventEdit = () => {
 		}, 0);
 	};
 
-    // Today's date in YYYY-MM-DD format for setting min attribute on date inputs
-    const today = new Date().toISOString().split('T')[0];
+	// Today's date in YYYY-MM-DD format for setting min attribute on date inputs
+	const today = new Date().toISOString().split('T')[0];
 
 	if (loading) {
 		return (
@@ -322,40 +322,40 @@ const EventEdit = () => {
 									</div>
 								</div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Start Date */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <Calendar size={14} className="text-white" /> Start Date <span className="text-red-400">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            name="date_start"
-                                            min={today}
-                                            required
-                                            value={event.date_start || ''}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-                                            style={{ background: 'rgba(255,255,255,0.03)' }}
-                                        />
-                                    </div>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+									{/* Start Date */}
+									<div className="space-y-2">
+										<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+											<Calendar size={14} className="text-white" /> Start Date <span className="text-red-400">*</span>
+										</label>
+										<input
+											type="date"
+											name="date_start"
+											min={today}
+											required
+											value={event.date_start || ''}
+											onChange={handleChange}
+											className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+											style={{ background: 'rgba(255,255,255,0.03)' }}
+										/>
+									</div>
 
 
-                                    {/* End Date */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <Calendar size={14} className="text-white" /> End Date
-                                        </label>
-                                        <input
-                                            type="date"
-                                            name="date_end"
-                                            min={event.date_start || today}
-                                            value={event.date_end || ''}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
-                                            style={{ background: 'rgba(255,255,255,0.03)' }}
-                                        />
-                                    </div>
+									{/* End Date */}
+									<div className="space-y-2">
+										<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+											<Calendar size={14} className="text-white" /> End Date
+										</label>
+										<input
+											type="date"
+											name="date_end"
+											min={event.date_start || today}
+											value={event.date_end || ''}
+											onChange={handleChange}
+											className="w-full px-4 py-3 rounded-xl border border-white/10 outline-none transition-all text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"
+											style={{ background: 'rgba(255,255,255,0.03)' }}
+										/>
+									</div>
 								</div>
 
 								{/* City */}
@@ -455,7 +455,11 @@ const EventEdit = () => {
 						{(!isNew && activeTab === 'info') ? (
 							<button
 								type="button"
-								className="flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors"
+								disabled={event.status !== 'not active'}
+								title={event.status !== 'not active' ? 'Cannot delete Events that are Active or Completed' : ''}
+								className={`flex items-center gap-2 text-red-400 hover:text-red-500 text-sm font-semibold transition-colors 
+									${event.status !== 'not active' ? 'opacity-50 cursor-not-allowed' : ''}
+								`}
 								onClick={() => setShowDeleteConfirm(true)}
 							>
 								<Trash2 size={16} /> Delete Event
