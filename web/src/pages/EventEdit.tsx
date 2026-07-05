@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy, AlertTriangle, X } from 'lucide-react';
+import { Save, ArrowLeft, Trash2, Calendar, MapPin, Tag, Mail, Image as ImageIcon, Loader2, Copy, AlertTriangle } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
 import CountrySelect from '@/components/CountrySelect';
 import EventFieldsBuilder from '@/components/EventFieldsBuilder';
@@ -203,7 +203,7 @@ const EventEdit = () => {
 						<>
 							{/* Status Section */}
 							<div className="pb-4 border-b border-white/5">
-								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3" onClick={() => setError('oops')}>
+								<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
 									<Tag size={14} className="text-primary" /> Event Status
 								</label>
 								<div className="flex flex-wrap gap-4">

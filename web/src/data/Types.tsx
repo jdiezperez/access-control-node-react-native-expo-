@@ -2,17 +2,12 @@ export type UserType = 'admin' | 'user' | 'guest';
 
 export interface Guest {
     id: number;
-    type: UserType;
-    name: string;
-    surname: string;
-    city: string;
-    country: string;
     email: string;
-    image: string;
     invited_date: string | null;
     accepted_date: string | null;
     attended_date: string | null;
     invitation_code?: string;
+    [key: string]: any;
 }
 
 export interface Sponsor {

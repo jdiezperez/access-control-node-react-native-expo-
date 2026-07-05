@@ -815,7 +815,7 @@ app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManage
 
 		await sequelize.transaction(async (t) => {
 			let [guest] = await Guest.findOrCreate({
-				where: { email: guestData.email },
+				where: { email: guestData.Email },
 				transaction: t
 			});
 
@@ -1145,11 +1145,11 @@ app.post('/api/admin/events', authenticateToken, isManagerOrAdmin, async (req, r
 				company_id: req.user.company_id
 			}, { transaction: t });
 
-			await Field.create({ event_id: event.id, field_name: 'Name', field_type: 'text', field_order: 0, required: true, editable: false }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'Surname', field_type: 'text', field_order: 1, required: true, editable: false }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'Email', field_type: 'text', field_order: 2, required: true, editable: false }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'City', field_type: 'text', field_order: 3, required: true, editable: false }, { transaction: t });
-			await Field.create({ event_id: event.id, field_name: 'Country', field_type: 'country', field_order: 4, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'name', field_type: 'text', field_order: 0, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'surname', field_type: 'text', field_order: 1, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'email', field_type: 'text', field_order: 2, required: true, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'city', field_type: 'text', field_order: 3, required: false, editable: false }, { transaction: t });
+			await Field.create({ event_id: event.id, field_name: 'country', field_type: 'country', field_order: 4, required: false, editable: false }, { transaction: t });
 
 			if (req.user.type === 'manager') {
 				await EventUser.create({ user_id: req.user.id, event_id: event.id }, { transaction: t });

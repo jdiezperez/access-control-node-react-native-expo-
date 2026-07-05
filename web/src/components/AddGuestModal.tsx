@@ -252,16 +252,16 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="text-sm font-semibold text-slate-600">{g.organization || '-'}</div>
+                                                    <div className="text-sm font-semibold text-slate-600">{(g as any).organization || '-'}</div>
                                                     <div className="text-xs text-slate-400 flex items-center gap-1">
                                                         <MapPin size={10} /> {g.city}{g.city && g.country ? ', ' : ''}{g.country || '-'}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                                                        <Briefcase size={14} className="text-slate-400" /> {g.role || '-'}
+                                                        <Briefcase size={14} className="text-slate-400" /> {(g as any).role || '-'}
                                                     </div>
-                                                    <div className="text-xs text-slate-400 capitalize">{g.gender || '-'}</div>
+                                                    <div className="text-xs text-slate-400 capitalize">{(g as any).gender || '-'}</div>
                                                 </td>
                                             </tr>
                                         ))}

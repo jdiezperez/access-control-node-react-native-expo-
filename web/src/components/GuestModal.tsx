@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Briefcase, Loader2, Save, Upload, MapPin } from 'lucide-react';
+import { X, User, Loader2, Save, Upload } from 'lucide-react';
 import axios from 'axios';
 
 interface Field {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Users as UsersIcon, Plus, Search, Mail, Shield, User, Trash2, Edit2, Loader2, Building2, CalendarPlus, AlertTriangle } from 'lucide-react';
+import { Users as UsersIcon, Plus, Search, Mail, Shield, User, Trash2, Edit2, Loader2, CalendarPlus, AlertTriangle } from 'lucide-react';
 import UserModal from '@/components/UserModal';
 import UserAssignEventsModal from '@/components/UserAssignEventsModal';
 

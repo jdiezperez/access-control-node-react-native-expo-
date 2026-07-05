@@ -52,7 +52,6 @@ const EventsGuests = () => {
     ];
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [genderFilter, setGenderFilter] = useState('');
     const [statusFilters, setStatusFilters] = useState({
         invited: false,
         accepted: false,
@@ -88,6 +87,17 @@ const EventsGuests = () => {
         setTimeout(() => setToast(null), 3000);
     };
 
+    const normalizeGuests = (guestsList: any[]) => {
+        return (guestsList || []).map(g => ({
+            ...g,
+            name: g.name || g.Name || '',
+            surname: g.surname || g.Surname || '',
+            city: g.city || g.City || '',
+            country: g.country || g.Country || '',
+            email: g.email || g.Email || ''
+        }));
+    };
+
     const fetchAll = useCallback(async () => {
         try {
             setLoading(true);
@@ -103,7 +113,7 @@ const EventsGuests = () => {
                 })
             ]);
             setEvent(eventRes.data);
-            setGuests(guestsRes.data);
+            setGuests(normalizeGuests(guestsRes.data));
             setEventFields([...(fieldsRes.data || []), ...baseGuestFields]);
         } catch (err) {
             console.error(err);
@@ -115,13 +125,13 @@ const EventsGuests = () => {
 
     useEffect(() => {
         fetchAll();
-    }, [fetchAll]);
+    }, []);
 
     const fetchEventGuests = async () => {
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/events/${id}/guests`, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        setGuests(res.data);
+        setGuests(normalizeGuests(res.data));
     };
 
     const handleRemoveGuest = async (userId: number) => {
@@ -222,11 +232,11 @@ const EventsGuests = () => {
             ...displayedFields.map(field => guestData[field.field_name])
         ].some(val => String(val ?? '').toLowerCase().includes(searchLower));
 
-        const matchesInvited = !statusFilters.invited || g.invited;
-        const matchesAccepted = !statusFilters.accepted || g.accepted;
-        const matchesAttended = !statusFilters.attended || g.attended;
+        const matchesInvited = !statusFilters.invited || g.invited_date;
+        const matchesAccepted = !statusFilters.accepted || g.accepted_date;
+        const matchesAttended = !statusFilters.attended || g.attended_date;
 
-        return matchesSearch && matchesGender && matchesInvited && matchesAccepted && matchesAttended;
+        return matchesSearch && matchesInvited && matchesAccepted && matchesAttended;
     }).sort((a, b) => {
         const guestA = a as GuestRecord;
         const guestB = b as GuestRecord;
@@ -293,7 +303,7 @@ const EventsGuests = () => {
 
             {/* Filters */}
             <div className="rounded-3xl border border-white/10 p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)' }}>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="relative md:col-span-2">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                         <input
@@ -305,19 +315,6 @@ const EventsGuests = () => {
                             style={{ background: 'rgba(255,255,255,0.03)' }}
                         />
                     </div>
-                    <select
-                        value={genderFilter}
-                        onChange={e => setGenderFilter(e.target.value)}
-                        className="w-full px-4 py-3 rounded-2xl border border-white/10 outline-none transition-all text-white focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 bg-slate-900"
-                        style={{ background: 'rgba(255,255,255,0.03)' }}
-                    >
-                        <option value="">All Genders</option>
-                        <option value="female">Female</option>
-                        <option value="male">Male</option>
-                        <option value="non binary">Non Binary</option>
-                        <option value="other">Other</option>
-                        <option value="prefer not to say">Prefer not to say</option>
-                    </select>
                     <div className="flex items-center justify-around rounded-2xl px-4 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
                         <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 cursor-pointer">
                             <input type="checkbox" checked={statusFilters.invited} onChange={e => setStatusFilters({ ...statusFilters, invited: e.target.checked })} className="rounded text-primary" /> Invited
@@ -356,7 +353,7 @@ const EventsGuests = () => {
                                             <th
                                                 key={field.id}
                                                 onClick={() => handleSort(field.field_name)}
-                                                className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black cursor-pointer hover:text-white transition-colors"
+                                                className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                                             >
                                                 <div className="flex items-center gap-1">
                                                     {formatFieldLabel(field.field_name)}
@@ -366,12 +363,12 @@ const EventsGuests = () => {
                                                 </div>
                                             </th>
                                         ))}
-                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest font-black text-center">Actions</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-center sticky right-0 z-30 bg-slate-900 ">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {filteredGuests.map(guest => {
-                                        const canShowBadge = guest.accepted && !!guest.accepted_date;
+                                        const canShowBadge = guest.accepted_date && !!guest.accepted_date;
                                         const isSendingInvite = invitingGuestId === guest.id;
                                         return (
                                             <tr key={guest.id} className="hover:bg-white/5 transition-colors">
@@ -383,13 +380,13 @@ const EventsGuests = () => {
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="px-6 py-4">
+                                                <td className="px-6 py-4 sticky right-0 z-20 bg-slate-900 ">
                                                     <div className="flex items-center justify-center gap-1">
                                                         {/* Invite single */}
                                                         <button
                                                             onClick={() => handleInviteSingle(guest)}
-                                                            disabled={isSendingInvite || !canInviteAll || guest.accepted}
-                                                            title={guest.accepted ? 'Guest already accepted the invitation' : canInviteAll ? `Send invitation to ${guest.name}` : 'Event must be Active with an email template'}
+                                                            disabled={isSendingInvite || !canInviteAll || !!guest.accepted_date}
+                                                            title={guest.accepted_date ? 'Guest already accepted the invitation' : canInviteAll ? `Send invitation to ${guest.name}` : 'Event must be Active with an email template'}
                                                             className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                                         >
                                                             {isSendingInvite
@@ -436,7 +433,7 @@ const EventsGuests = () => {
                         {/* Mobile/Tablet Card View */}
                         <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
                             {filteredGuests.map(guest => {
-                                const canShowBadge = guest.accepted && !!guest.accepted_date;
+                                const canShowBadge = guest.accepted_date && !!guest.accepted_date;
                                 const isSendingInvite = invitingGuestId === guest.id;
                                 return (
                                     <div key={guest.id} className="rounded-2xl border border-white/10 p-5 flex flex-col gap-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -449,7 +446,6 @@ const EventsGuests = () => {
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-bold text-white text-base capitalize truncate">{guest.name} {guest.surname}</h3>
                                                 <p className="text-xs text-slate-400 truncate mt-0.5">{guest.email}</p>
-                                                <p className="text-xs text-slate-300 font-semibold mt-1 capitalize">{guest.role || 'No Role'} • {guest.organization || 'No Organization'}</p>
                                             </div>
                                         </div>
 
@@ -458,7 +454,7 @@ const EventsGuests = () => {
                                             <div className="text-center">
                                                 <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Invited</span>
                                                 <div className="flex flex-col items-center justify-center min-h-[32px]">
-                                                    {guest.invited ? (
+                                                    {guest.invited_date ? (
                                                         <>
                                                             <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-bold">Yes</span>
                                                             {guest.invited_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.invited_date).toLocaleDateString()}</span>}
@@ -471,7 +467,7 @@ const EventsGuests = () => {
                                             <div className="text-center">
                                                 <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Accepted</span>
                                                 <div className="flex flex-col items-center justify-center min-h-[32px]">
-                                                    {guest.accepted ? (
+                                                    {guest.accepted_date ? (
                                                         <>
                                                             <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">Yes</span>
                                                             {guest.accepted_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.accepted_date).toLocaleDateString()}</span>}
@@ -484,7 +480,7 @@ const EventsGuests = () => {
                                             <div className="text-center">
                                                 <span className="block text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Attended</span>
                                                 <div className="flex flex-col items-center justify-center min-h-[32px]">
-                                                    {guest.attended ? (
+                                                    {guest.attended_date ? (
                                                         <>
                                                             <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20 font-bold">Yes</span>
                                                             {guest.attended_date && <span className="text-[8px] text-slate-500 mt-1">{new Date(guest.attended_date).toLocaleDateString()}</span>}
@@ -499,14 +495,13 @@ const EventsGuests = () => {
                                         {/* Location & Details */}
                                         <div className="text-xs text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
                                             <span><strong>Location:</strong> {guest.city || '-'}{guest.city && guest.country ? ', ' : ''}{guest.country || ''}</span>
-                                            <span><strong>Gender:</strong> <span className="capitalize">{guest.gender || '-'}</span></span>
                                         </div>
 
                                         {/* Actions */}
                                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
                                             <button
                                                 onClick={() => handleInviteSingle(guest)}
-                                                disabled={isSendingInvite || !canInviteAll || guest.accepted}
+                                                disabled={isSendingInvite || !canInviteAll || !!guest.accepted_date}
                                                 className="flex-1 max-w-[120px] flex items-center justify-center gap-2 py-2 border border-white/10 rounded-xl hover:text-white hover:bg-white/5 transition-all text-xs font-semibold text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed"
                                             >
                                                 {isSendingInvite ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
