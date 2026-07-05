@@ -236,7 +236,7 @@ const EventEdit = () => {
 								</div>
 							</div>
 
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div className="md:grid grid-cols-1 md:grid-cols-2 gap-6">
 								{/* Name */}
 								<div className="space-y-2 col-span-2">
 									<label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
