@@ -172,28 +172,6 @@ const GuestModal = ({ isOpen, onClose, onSave, guestToEdit, eventId }: GuestModa
                         </div>
                     )}
 
-                    {/* Image Upload */}
-                    <div className="flex justify-center pb-4">
-                        <div className="relative group">
-                            <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
-                                {formData.image ? (
-                                    <img src={`${import.meta.env.VITE_API_URL}${formData.image}`} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <User className="text-slate-300" size={40} />
-                                )}
-                                {uploading && (
-                                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-                                        <Loader2 className="animate-spin text-primary" size={20} />
-                                    </div>
-                                )}
-                            </div>
-                            <label className="absolute -bottom-1 -right-1 p-2 bg-primary text-white rounded-full shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                                <Upload size={14} />
-                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
-                            </label>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {sortedFields.map(field => {
                             const value = formData[field.field_name] || '';
