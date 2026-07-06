@@ -807,7 +807,6 @@ app.get('/api/admin/guests/:id/events', authenticateToken, isManagerOrAdmin, asy
 app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManagerOrAdmin, isEventAssigned, async (req, res) => {
 	const { eventId } = req.params;
 	const { guestData } = req.body;
-
 	try {
 		const event = await Event.findByPk(eventId);
 		if (!event || event.company_id !== req.user.company_id) return res.status(404).json({ message: 'Event not found' });
@@ -815,7 +814,7 @@ app.post('/api/admin/events/:eventId/guests/create', authenticateToken, isManage
 
 		await sequelize.transaction(async (t) => {
 			let [guest] = await Guest.findOrCreate({
-				where: { email: guestData.Email },
+				where: { email: guestData.email },
 				transaction: t
 			});
 

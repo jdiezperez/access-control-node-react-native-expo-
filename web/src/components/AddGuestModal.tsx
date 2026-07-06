@@ -59,7 +59,6 @@ const AddGuestsModal = ({ onClose, onAdded, eventId }: { onClose: () => void, on
                 res.data.forEach((f: any) => {
                     initialData[f.field_name] = '';
                 });
-                initialData.image = '';
                 setNewGuest(initialData);
             } catch (err) {
                 console.error('Failed to fetch event fields', err);
