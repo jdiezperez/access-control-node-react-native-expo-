@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-    ArrowLeft, Plus, Upload, Search, X,
+    ArrowLeft, Plus, Upload, Download, Search, X,
     ChevronUp, ChevronDown, Filter, Loader2, Unlink,
     User, QrCode, Mail, AlertCircle, CheckCircle2,
     Mails, Edit2
@@ -217,6 +217,25 @@ const EventsGuests = () => {
         }
     };
 
+    const handleExportTemplate = () => {
+        const headers = eventFields
+            .filter(field => !baseGuestFields.some(baseField => baseField.field_name === field.field_name) && field.field_type !== 'image')
+            .sort((a, b) => a.field_order - b.field_order)
+            .map(field => field.field_name);
+
+        const csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${event?.name || 'event'}_import_template.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const canInviteAll = event?.status === 'active' && !!event?.email_template;
 
     const displayedFields = [
@@ -279,6 +298,14 @@ const EventsGuests = () => {
                         className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-emerald-500/20 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-emerald-600"
                     >
                         <Mails size={16} /> Invite All
+                    </button>
+
+                    <button
+                        onClick={handleExportTemplate}
+                        title="Export CSV template with custom fields"
+                        className="flex items-center gap-2 px-5 py-3 border border-white/10 rounded-2xl hover:text-white hover:bg-white/5 transition-all font-semibold text-slate-400 cursor-pointer"
+                    >
+                        <Download size={16} /> Export CSV Template
                     </button>
 
                     <button
