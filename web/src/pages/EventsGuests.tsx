@@ -223,8 +223,10 @@ const EventsGuests = () => {
             .sort((a, b) => a.field_order - b.field_order)
             .map(field => field.field_name);
 
+        console.log(headers);
+
         const csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',');
-        
+
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -285,21 +287,6 @@ const EventsGuests = () => {
                     </div>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-                    {/* Invite All */}
-                    <button
-                        onClick={() => { setShowInviteAllModal(true); setInviteAllResult(null); }}
-                        disabled={!canInviteAll}
-                        title={
-                            !event ? 'Loading...' :
-                                event.status !== 'active' ? 'Event must be Active to send invitations' :
-                                    !event.email_template ? 'No email template set for this event' :
-                                        'Send invitations to all guests'
-                        }
-                        className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-emerald-500/20 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-emerald-600"
-                    >
-                        <Mails size={16} /> Invite All
-                    </button>
-
                     <button
                         onClick={handleExportTemplate}
                         title="Export CSV template with custom fields"
@@ -324,6 +311,19 @@ const EventsGuests = () => {
                         style={{ background: event?.status === 'active' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#475569' }}
                     >
                         <Plus size={16} /> Add Guests
+                    </button>
+                    <button
+                        onClick={() => { setShowInviteAllModal(true); setInviteAllResult(null); }}
+                        disabled={!canInviteAll}
+                        title={
+                            !event ? 'Loading...' :
+                                event.status !== 'active' ? 'Event must be Active to send invitations' :
+                                    !event.email_template ? 'No email template set for this event' :
+                                        'Send invitations to all guests'
+                        }
+                        className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-white font-bold shadow-xl shadow-emerald-500/20 hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-emerald-600"
+                    >
+                        <Mails size={16} /> Invite All
                     </button>
                 </div>
             </div>

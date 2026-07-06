@@ -1816,7 +1816,7 @@ app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAd
 	}
 
 	const lines = fileContent.split(/\r?\n/);
-	const header = lines[0].split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+	const header = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase()).filter(Boolean);
 
 	const errors = [];
 	let importedCount = 0;
@@ -1846,47 +1846,65 @@ app.post('/api/admin/events/:id/guests/import', authenticateToken, isManagerOrAd
 			}
 		});
 
+		let committedCount = 0;
 		await sequelize.transaction(async (t) => {
 			for (let i = 1; i < lines.length; i++) {
 				if (!lines[i].trim()) continue;
 
-				const values = lines[i].split(',').map(v => v.trim());
+				const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
 				const row = {};
 				header.forEach((h, index) => {
 					row[h] = values[index] !== undefined ? values[index] : '';
 				});
 
-				if (!row.email) {
+				// email lookup is always against the lowercased header key
+				const emailVal = row['email'];
+				if (!emailVal) {
 					errors.push(`Line ${i + 1}: Missing email`);
 					continue;
 				}
 
-				let [guest] = await Guest.findOrCreate({
-					where: { email: row.email },
-					transaction: t
-				});
+				try {
+					let [guest] = await Guest.findOrCreate({
+						where: { email: emailVal },
+						transaction: t
+					});
 
-				const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-				await EventGuest.findOrCreate({
-					where: { guest_id: guest.id, event_id: eventId },
-					defaults: { invitation_code: invitationCode },
-					transaction: t
-				});
+					const invitationCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+					await EventGuest.findOrCreate({
+						where: { guest_id: guest.id, event_id: eventId },
+						defaults: { invitation_code: invitationCode },
+						transaction: t
+					});
 
-				// Insert field data (name, surname, email and any extras)
-				for (const field of eventFields) {
-					const val = row[field.field_name.toLowerCase()];
-					if (val !== undefined) {
-						await GuestData.upsert({
-							guest_id: guest.id,
-							field_id: field.id,
-							field_value: val
-						}, { transaction: t });
+					// Insert field data — use explicit findOrCreate+update instead of upsert for SQLite reliability
+					for (const field of eventFields) {
+						const csvKey = field.field_name.toLowerCase();
+						const val = row[csvKey];
+						if (val !== undefined && val !== '') {
+							const existing = await GuestData.findOne({
+								where: { guest_id: guest.id, field_id: field.id },
+								transaction: t
+							});
+							if (existing) {
+								await existing.update({ field_value: val }, { transaction: t });
+							} else {
+								await GuestData.create({
+									guest_id: guest.id,
+									field_id: field.id,
+									field_value: val
+								}, { transaction: t });
+							}
+						}
 					}
+					committedCount++;
+				} catch (rowErr) {
+					console.error(`Import error on line ${i + 1}:`, rowErr);
+					errors.push(`Line ${i + 1}: ${rowErr.message}`);
 				}
-				importedCount++;
 			}
 		});
+		importedCount = committedCount;
 
 		fs.unlinkSync(req.file.path);
 		res.json({
