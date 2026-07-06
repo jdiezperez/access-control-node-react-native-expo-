@@ -46,8 +46,8 @@ const Login = () => {
         <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
             <div className="w-full max-w-md">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-3xl text-primary mb-6 animate-in fade-in zoom-in duration-500">
-                        <img src='/logo_entrypoint.png' className="w-10 h-10 object-contain" />
+                    <div className="inline-flex items-center justify-center w-24 h-24 bg-primary/10 rounded-3xl text-primary mb-6 animate-in fade-in zoom-in duration-500">
+                        <img src='/logo_entrypoint.png' className="w-20 h-20 object-contain" />
                     </div>
                     <h1 className="text-4xl font-black text-white tracking-tight mb-2">Admin Portal</h1>
                     <p className="text-slate-500 font-medium">Access your company management dashboard</p>
