@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { CheckCircle2, Loader2, User, Mail, MapPin, Building2, Tag, AlertCircle, Camera } from 'lucide-react';
+import { CheckCircle2, Loader2, User, Mail, MapPin, AlertCircle, Camera, Upload } from 'lucide-react';
 import { getImagePath } from '@/utils/imagePath';
+import CountrySelect from '../components/CountrySelect';
+
+interface Field {
+    id: number;
+    event_id: number;
+    field_name: string;
+    field_type: 'text' | 'number' | 'yes/no' | 'options' | 'date' | 'country' | 'image';
+    field_values?: string;
+    field_order: number;
+    required: number | boolean;
+}
 
 const PublicConfirmation = () => {
     const { code } = useParams();
@@ -10,18 +21,12 @@ const PublicConfirmation = () => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [confirmed, setConfirmed] = useState(false);
-    
+    const [uploading, setUploading] = useState(false);
+
     const [event, setEvent] = useState<any>(null);
-    const [guest, setGuest] = useState<any>({
-        name: '',
-        surname: '',
-        city: '',
-        country: '',
-        organization: '',
-        role: '',
-        gender: '',
-        image: ''
-    });
+    const [fields, setFields] = useState<Field[]>([]);
+    const [guest, setGuest] = useState<Record<string, any>>({});
+    const [email, setEmail] = useState<string>('');
 
     useEffect(() => {
         fetchData();
@@ -36,19 +41,28 @@ const PublicConfirmation = () => {
                 name: data.event_name,
                 city: data.city,
                 country: data.country,
-                date: data.date
+                date_start: data.date_start,
+                date_end: data.date_end,
+                date: data.date,
+                logo: data.logo
             });
-            setGuest({
-                name: data.name || '',
-                surname: data.surname || '',
-                city: data.city || '',
-                country: data.country || '',
-                organization: data.organization || '',
-                role: data.role || '',
-                gender: data.gender || '',
-                image: data.image || '',
-                email: data.email
-            });
+            setEmail(data.email || '');
+            setFields(data.fields || []);
+
+            // Initialize form state using event fields definitions and backend-returned values
+            const initialData: Record<string, any> = {};
+            if (data.fields) {
+                data.fields.forEach((f: Field) => {
+                    initialData[f.field_name] = data.guestData?.[f.field_name] || '';
+                });
+            }
+            // Always ensure image is initialized
+            if (data.guestData?.image !== undefined) {
+                initialData.image = data.guestData.image;
+            } else {
+                initialData.image = '';
+            }
+            setGuest(initialData);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Invalid or expired invitation link.');
         } finally {
@@ -58,6 +72,18 @@ const PublicConfirmation = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate required fields
+        const missingRequired = fields.find(f => {
+            const isReq = f.required === 1 || f.required === true;
+            return isReq && !guest[f.field_name];
+        });
+
+        if (missingRequired) {
+            setError(`Please fill in all mandatory fields (${missingRequired.field_name})`);
+            return;
+        }
+
         try {
             setSubmitting(true);
             await axios.post(`${import.meta.env.VITE_API_URL}/api/public/confirm`, {
@@ -77,13 +103,16 @@ const PublicConfirmation = () => {
         if (!file) return;
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('image', file);
 
         try {
+            setUploading(true);
             const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload?folder=users`, formData);
-            setGuest({ ...guest, image: res.data.url });
+            setGuest(prev => ({ ...prev, image: res.data.url }));
         } catch (err) {
             alert('Error uploading image');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -142,6 +171,11 @@ const PublicConfirmation = () => {
                     <div className="bg-slate-900 p-8 text-white">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
+                                {event.logo && (
+                                    <img src={getImagePath(event.logo, 'events')} alt={event.name} className="h-20 object-cover" />
+                                )}
+                            </div>
+                            <div>
                                 <p className="text-primary font-bold text-sm uppercase tracking-widest mb-1">Event Invitation</p>
                                 <h1 className="text-3xl font-bold leading-tight">{event.name}</h1>
                             </div>
@@ -164,126 +198,141 @@ const PublicConfirmation = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Profile Image */}
-                            <div className="flex flex-col items-center gap-4 mb-8">
-                                <div className="relative group">
-                                    <div className="w-32 h-32 rounded-3xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
-                                        {guest.image ? (
-                                            <img src={getImagePath(guest.image, 'users')} alt="Profile" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User size={48} className="text-slate-300" />
-                                        )}
+                            {/* Profile Image (if image field exists) */}
+                            {fields.find(f => f.field_type === 'image') && (
+                                <div className="flex flex-col items-center gap-4 mb-8">
+                                    <div className="relative group">
+                                        <div className="w-32 h-32 rounded-3xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
+                                            {guest.image ? (
+                                                <img src={getImagePath(guest.image, 'users')} alt="Profile" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User size={48} className="text-slate-300" />
+                                            )}
+                                            {uploading && (
+                                                <div className="absolute inset-0 bg-white/85 flex items-center justify-center">
+                                                    <Loader2 className="animate-spin text-primary" size={24} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <label className="absolute -right-2 -bottom-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-all border-4 border-white">
+                                            <Camera size={18} />
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+                                        </label>
                                     </div>
-                                    <label className="absolute -right-2 -bottom-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-all border-4 border-white">
-                                        <Camera size={18} />
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                                    </label>
+                                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Profile Photo</p>
                                 </div>
-                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Profile Photo</p>
-                            </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <User size={14} /> First Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.name}
-                                        onChange={e => setGuest({ ...guest, name: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <User size={14} /> Last Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.surname}
-                                        onChange={e => setGuest({ ...guest, surname: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <Mail size={14} /> Email Address
-                                    </label>
-                                    <input
-                                        disabled
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 outline-none transition-all"
-                                        value={guest.email}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <Tag size={14} /> Role <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        placeholder="e.g. CEO, Developer, Manager"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.role}
-                                        onChange={e => setGuest({ ...guest, role: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <Building2 size={14} /> Organization <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        placeholder="e.g. Acme Corp"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.organization}
-                                        onChange={e => setGuest({ ...guest, organization: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <MapPin size={14} /> City <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.city}
-                                        onChange={e => setGuest({ ...guest, city: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <MapPin size={14} /> Country <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
-                                        value={guest.country}
-                                        onChange={e => setGuest({ ...guest, country: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2 col-span-1">
-                                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        Gender <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        required
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700 bg-white"
-                                        value={guest.gender}
-                                        onChange={e => setGuest({ ...guest, gender: e.target.value })}
-                                    >
-                                        <option value="">Select Gender</option>
-                                        <option value="female">Female</option>
-                                        <option value="male">Male</option>
-                                        <option value="non binary">Non Binary</option>
-                                        <option value="other">Other</option>
-                                        <option value="prefer not to say">Prefer not to say</option>
-                                    </select>
-                                </div>
+
+                                {fields
+                                    .filter(f => f.field_type !== 'image')
+                                    .sort((a, b) => a.field_order - b.field_order)
+                                    .map(field => {
+                                        const value = guest[field.field_name] || '';
+                                        const onChange = (val: any) => setGuest(prev => ({ ...prev, [field.field_name]: val }));
+                                        const isRequired = field.required === 1 || field.required === true;
+                                        const labelText = `${field.field_name.charAt(0).toUpperCase() + field.field_name.slice(1)}`;
+
+                                        return (
+                                            <div key={field.id} className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                                    {labelText} {isRequired && <span className="text-red-500">*</span>}
+                                                </label>
+                                                {(() => {
+                                                    switch (field.field_type) {
+                                                        case 'number':
+                                                            return (
+                                                                <input
+                                                                    required={isRequired}
+                                                                    type="number"
+                                                                    value={value}
+                                                                    onChange={e => onChange(e.target.value)}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
+                                                                />
+                                                            );
+                                                        case 'yes/no':
+                                                            return (
+                                                                <div className="flex gap-6 items-center py-2">
+                                                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`confirm-${field.field_name}`}
+                                                                            value="yes"
+                                                                            checked={value === 'yes'}
+                                                                            onChange={() => onChange('yes')}
+                                                                            required={isRequired}
+                                                                            className="w-4 h-4 text-primary focus:ring-primary"
+                                                                        />
+                                                                        Yes
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name={`confirm-${field.field_name}`}
+                                                                            value="no"
+                                                                            checked={value === 'no'}
+                                                                            onChange={() => onChange('no')}
+                                                                            required={isRequired}
+                                                                            className="w-4 h-4 text-primary focus:ring-primary"
+                                                                        />
+                                                                        No
+                                                                    </label>
+                                                                </div>
+                                                            );
+                                                        case 'options':
+                                                            return (
+                                                                <select
+                                                                    required={isRequired}
+                                                                    value={value}
+                                                                    onChange={e => onChange(e.target.value)}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700 bg-white"
+                                                                >
+                                                                    <option value="">Select option</option>
+                                                                    {field.field_values?.split('|').map(v => v.trim()).filter(Boolean).map(opt => (
+                                                                        <option key={opt} value={opt}>{opt}</option>
+                                                                    ))}
+                                                                </select>
+                                                            );
+                                                        case 'date':
+                                                            return (
+                                                                <input
+                                                                    required={isRequired}
+                                                                    type="date"
+                                                                    value={value}
+                                                                    onChange={e => onChange(e.target.value)}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
+                                                                />
+                                                            );
+                                                        case 'country':
+                                                            return (
+                                                                <CountrySelect
+                                                                    value={value}
+                                                                    onChange={onChange}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700 bg-white"
+                                                                />
+                                                            );
+                                                        case 'text':
+                                                        default:
+                                                            return (
+                                                                <input
+                                                                    required={isRequired}
+                                                                    type="text"
+                                                                    value={value}
+                                                                    onChange={e => onChange(e.target.value)}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-700"
+                                                                />
+                                                            );
+                                                    }
+                                                })()}
+                                            </div>
+                                        );
+                                    })}
                             </div>
 
                             <button
                                 type="submit"
-                                disabled={submitting}
+                                disabled={submitting || uploading}
                                 className="w-full mt-8 py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {submitting ? (

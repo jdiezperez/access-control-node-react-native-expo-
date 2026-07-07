@@ -1030,6 +1030,8 @@ app.post('/api/admin/events/:id/guests/:guestId/invite', authenticateToken, isMa
 				guest[row.field.field_name] = row.field_value;
 			}
 		});
+		console.log('guestDataRows', guestDataRows);
+
 
 		const html = buildEmailHtml(event.email_template, guest, event, guest.invitation_code);
 		const response = await axios.post(SENDPIGEON_API, {
@@ -1932,10 +1934,23 @@ app.get('/api/public/confirmation/:code', async (req, res) => {
 		const guest = await Guest.findByPk(eg.guest_id);
 		const event = await Event.findByPk(eg.event_id);
 
-		// Enrich with field data
+		// Fetch all fields for this event
+		const fields = await Field.findAll({
+			where: { event_id: eg.event_id },
+			order: [['field_order', 'ASC']]
+		});
+
+		// Fetch existing guest data
 		const fieldRows = await GuestData.findAll({
 			where: { guest_id: eg.guest_id },
 			include: [{ model: Field, as: 'field', where: { event_id: eg.event_id } }]
+		});
+
+		const guestData = {};
+		fieldRows.forEach(r => {
+			if (r.field) {
+				guestData[r.field.field_name] = r.field_value;
+			}
 		});
 
 		const data = {
@@ -1948,8 +1963,11 @@ app.get('/api/public/confirmation/:code', async (req, res) => {
 			date_start: event.date_start,
 			date_end: event.date_end,
 			date: event.date_start,
+			logo: event.logo,
 			accepted: eg.accepted_date ? 1 : 0,
-			invitation_code: eg.invitation_code
+			invitation_code: eg.invitation_code,
+			fields: fields,
+			guestData: guestData
 		};
 
 		res.json(data);
@@ -1971,24 +1989,39 @@ app.post('/api/public/confirm', async (req, res) => {
 		const guest = await Guest.findByPk(eg.guest_id);
 		const event = await Event.findByPk(eg.event_id);
 
-		// Upsert field data (name, surname, etc.) into guestdata
+		// Dynamic saving of custom field data
 		const fields = await Field.findAll({ where: { event_id: eg.event_id } });
 		await sequelize.transaction(async (t) => {
 			for (const f of fields) {
-				if (userData[f.field_name] !== undefined) {
-					await GuestData.upsert({
-						guest_id: eg.guest_id,
-						field_id: f.id,
-						field_value: userData[f.field_name]
-					}, { transaction: t });
+				const val = userData[f.field_name];
+				if (val !== undefined && val !== null) {
+					const existing = await GuestData.findOne({
+						where: { guest_id: eg.guest_id, field_id: f.id },
+						transaction: t
+					});
+					if (existing) {
+						await existing.update({ field_value: val }, { transaction: t });
+					} else {
+						await GuestData.create({
+							guest_id: eg.guest_id,
+							field_id: f.id,
+							field_value: val
+						}, { transaction: t });
+					}
 				}
 			}
 			await eg.update({ accepted_date: new Date() }, { transaction: t });
 		});
 
+		// Build a guest object representing all fields (for the badge email)
+		const guestForBadge = {
+			email: guest.email,
+			invitation_code: code,
+			...userData
+		};
+
 		// Send Badge Email
 		try {
-			const guestForBadge = { ...userData, invitation_code: code };
 			const badgeHtml = buildBadgeEmailHtml(guestForBadge, event);
 			await axios.post(SENDPIGEON_API, {
 				from: EMAIL_FROM,

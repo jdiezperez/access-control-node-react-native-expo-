@@ -159,19 +159,14 @@ const EventsGuests = () => {
         .replace(/_/g, ' ')
         .replace(/\b\w/g, char => char.toUpperCase());
 
-    const formatCellValue = (value: unknown) => {
+    const formatCellValue = (value: string, type: string) => {
         if (value === null || value === undefined || value === '') return '-';
 
-        if (typeof value === 'string' && value.trim()) {
-            const trimmed = value.trim();
-            const date = new Date(trimmed);
-            if (!Number.isNaN(date.getTime()) && trimmed.includes('-')) {
-                return date.toLocaleString();
-            }
-            return trimmed;
+        if (type === 'date') {
+            return new Date(value).toLocaleDateString().split('T')[0];
         }
 
-        return String(value);
+        return String(value.trim());
     };
 
     const normalizeCellValue = (value: unknown) => {
@@ -403,7 +398,7 @@ const EventsGuests = () => {
                                                     const value = (guest as GuestRecord)[field.field_name];
                                                     return (
                                                         <td key={field.id} className="px-6 py-4 text-slate-300 text-sm">
-                                                            {formatCellValue(value)}
+                                                            {formatCellValue(value, field.field_type)}
                                                         </td>
                                                     );
                                                 })}
