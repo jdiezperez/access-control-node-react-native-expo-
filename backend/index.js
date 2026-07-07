@@ -2021,16 +2021,16 @@ app.post('/api/public/confirm', async (req, res) => {
 		};
 
 		// Send Badge Email
-		try {
-			const badgeHtml = buildBadgeEmailHtml(guestForBadge, event);
-			await axios.post(SENDPIGEON_API, {
-				from: EMAIL_FROM,
-				to: guest.email,
-				subject: `Confirmation & Digital Badge: ${event.name}`,
-				html: badgeHtml,
-			}, { headers: sendpigeonHeaders() });
-		} catch (err) {
-			console.error('Failed to send badge email:', err.message);
+		const badgeHtml = buildBadgeEmailHtml(guestForBadge, event);
+		const response = await axios.post(SENDPIGEON_API, {
+			from: EMAIL_FROM,
+			to: guest.email,
+			subject: `Confirmation & Digital Badge: ${event.name}`,
+			html: badgeHtml,
+		}, { headers: sendpigeonHeaders() });
+
+		if (response.data?.status === 'failed') {
+			return res.status(500).json({ message: 'Email delivery failed' });
 		}
 
 		res.json({ success: true });
